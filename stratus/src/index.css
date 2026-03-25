@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Global design tokens */
+:root {
+  --stroke: #EDEFF4;
+  --text-main: #272835;
+  --text-muted: #808897;
+  --text-subtle: #808897;
+}
+
+@theme {
+  /* ── Stratus design tokens (from Figma) ── */
+  --color-primary-300: #3e50f7;
+  --color-primary-100: #6573f9;
+
+  --color-grey-700: #272835;
+  --color-grey-600: #353849;
+  --color-grey-400: #808897;
+  --color-grey-300: #808897;
+  --color-grey-100: #EDEFF4;
+  --color-grey-base: #f4f5f8;
+  --color-white: #ffffff;
+
+  --color-status-pending-bg: #fff7ed;
+  --color-status-pending-text: #c2660a;
+  --color-status-pending-icon: #f97316;
+
+  --font-family-sans: "Inter", "Avenir LT Pro", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family-sans);
+  background-color: #f4f5f8;
+  color: #272835;
+  -webkit-font-smoothing: antialiased;
+}
