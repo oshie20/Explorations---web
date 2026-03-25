@@ -77,7 +77,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Ask Lyra */}
         <button
-          className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-85 min-h-[44px] px-3 sm:px-4 bg-white"
+          className="inline-flex items-center justify-center sm:justify-start gap-0 sm:gap-1.5 text-sm font-medium transition-opacity hover:opacity-85 w-11 sm:w-auto h-11 px-0 sm:px-4 bg-white"
           style={{ borderRadius: "12px", border: "1.5px solid rgba(122, 105, 255, 0.5)" }}
         >
           <AskLyraIcon className="text-[#7A69FF] shrink-0" />
@@ -94,7 +94,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         </button>
 
         {/* Notifications */}
-        <button className="relative w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center bg-white border border-[#EDEFF4] hover:bg-[#f4f5f8] transition-colors text-[#808897]" style={{ borderRadius: "12px" }}>
+        <button className="relative w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white border border-[#EDEFF4] hover:bg-[#f4f5f8] transition-colors text-[#808897]" style={{ borderRadius: "12px" }}>
           <NotificationIcon />
           <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#3e50f7] rounded-full" />
         </button>

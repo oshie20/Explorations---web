@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 function InvoiceIcon() {
@@ -148,16 +148,32 @@ function avatarForRequester(requester: string) {
 
 export function PendingTable() {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [drawerMounted, setDrawerMounted] = useState(false);
   const [selectedRow, setSelectedRow] = useState<TableRow | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
 
   function openDetails(row: TableRow) {
+    // Force the drawer to animate even if another row is opened quickly.
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
     setSelectedRow(row);
-    setDetailsOpen(true);
+    setDrawerMounted(true);
+    setDetailsOpen(false);
+    requestAnimationFrame(() => setDetailsOpen(true));
   }
 
   function closeDetails() {
+    if (closeTimerRef.current) return;
     setDetailsOpen(false);
-    setSelectedRow(null);
+
+    // Keep mounted long enough for slide-out transition to play.
+    closeTimerRef.current = window.setTimeout(() => {
+      setSelectedRow(null);
+      setDrawerMounted(false);
+      closeTimerRef.current = null;
+    }, 430);
   }
 
   useEffect(() => {
@@ -170,6 +186,26 @@ export function PendingTable() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [detailsOpen]);
+
+  useEffect(() => {
+    if (!drawerMounted) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [drawerMounted]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, []);
 
   function formatOrdinal(day: number): string {
     if (day % 100 >= 11 && day % 100 <= 13) return `${day}th`;
@@ -278,7 +314,7 @@ export function PendingTable() {
             className={
               tab === "Pending requests"
                 ? "py-3 px-1 text-xs sm:text-sm font-medium text-[#3e50f7] border-b-2 border-[#3e50f7] -mb-px whitespace-nowrap shrink-0"
-                : "py-3 px-1 text-xs sm:text-sm text-[#808897] hover:text-[#272835] transition-colors whitespace-nowrap shrink-0"
+                : "py-3 px-1 text-xs sm:text-sm font-normal text-[#808897] hover:text-[#272835] transition-colors whitespace-nowrap shrink-0"
             }
           >
             {tab}
@@ -383,15 +419,22 @@ export function PendingTable() {
       </div>
 
       {/* Details drawer */}
-      {detailsOpen && selectedRow && createPortal(
+      {drawerMounted && selectedRow && createPortal(
         <div className="fixed inset-0 z-[200]">
           <div
-            className="fixed inset-0 bg-black/40"
+            className={
+              "fixed inset-0 bg-black/40 transition-opacity duration-[430ms] ease-[cubic-bezier(0.22,1,0.36,1)] " +
+              (detailsOpen ? "opacity-100" : "opacity-0 pointer-events-none")
+            }
             onClick={closeDetails}
             aria-hidden
           />
           <div
-            className="fixed top-0 bottom-0 right-0 bg-white border-l border-[#EDEFF4] w-full overflow-y-auto md:w-[520px] md:rounded-none"
+            className={
+              "fixed top-0 bottom-0 right-0 bg-white border-l border-[#EDEFF4] w-full overflow-y-auto md:w-[520px] md:rounded-none " +
+              "transform transition-all duration-[430ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform " +
+              (detailsOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0")
+            }
             role="dialog"
             aria-modal="true"
           >
@@ -417,38 +460,39 @@ export function PendingTable() {
             </div>
 
             <div className="px-4 sm:px-6 py-4 space-y-5 pb-8">
-              {/* Total amount + breakdown */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-[#808897] font-medium">Total amount</p>
-                  <p className="text-sm font-semibold text-[#272835]">{selectedRow.amount}</p>
-                </div>
+              {/* Total amount + breakdown + Type/Due/Requested (combined card) */}
+              <div className="border border-[#EDEFF4] rounded-[14px] overflow-hidden bg-white">
+                <div className="p-5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-[#808897] font-medium">Total amount</p>
+                    <p className="text-sm font-semibold text-[#272835]">{selectedRow.amount}</p>
+                  </div>
 
-                <div className="border border-[#EDEFF4] rounded-[14px] bg-[#FAFBFD] p-4">
-                  <div className="space-y-3">
-                    {breakdownItems.map((it) => (
-                      <div key={it.name} className="space-y-1">
-                        <p className="text-sm text-[#272835]">{it.name}</p>
-                        <p className="text-sm font-medium text-[#272835]">
-                          {it.unit.toLocaleString(undefined, { style: "currency", currency: "USD" })} x {it.qty}
-                        </p>
-                      </div>
-                    ))}
+                  <div className="mt-3 rounded-[14px] bg-[#FAFBFD] p-4">
+                    <div className="space-y-3">
+                      {breakdownItems.map((it) => (
+                        <div key={it.name} className="space-y-1">
+                          <p className="text-sm text-[#808897]">{it.name}</p>
+                          <p className="text-sm font-medium text-[#272835]">
+                            {it.unit.toLocaleString(undefined, { style: "currency", currency: "USD" })} x {it.qty}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Type / Due date / Requested by / Category / Status */}
-              <div className="border border-[#EDEFF4] rounded-lg overflow-hidden">
-                <div className="px-4 py-4 flex items-center justify-between bg-white">
+                <div className="border-t border-[#EDEFF4]" />
+
+                <div className="p-5 flex items-center justify-between bg-white">
                   <p className="text-sm text-[#808897] font-medium">Type:</p>
                   <p className="text-sm font-semibold text-[#272835]">{selectedRow.type}</p>
                 </div>
-                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                <div className="p-5 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
                   <p className="text-sm text-[#808897] font-medium">Due date:</p>
                   <p className="text-sm font-semibold text-[#272835]">{dueDate}</p>
                 </div>
-                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                <div className="p-5 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
                   <p className="text-sm text-[#808897] font-medium">Requested by:</p>
                   <div className="flex items-center gap-2">
                     {avatarForRequester(selectedRow.requester) ? (
@@ -468,14 +512,14 @@ export function PendingTable() {
                     <p className="text-sm font-semibold text-[#272835] whitespace-nowrap">{requesterName}</p>
                   </div>
                 </div>
-                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                <div className="p-5 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
                   <p className="text-sm text-[#808897] font-medium">Category:</p>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-[#F4F5F8] text-[#272835] text-xs font-medium">
                     {categoryIcon[selectedRow.category]}
                     {selectedRow.category}
                   </span>
                 </div>
-                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                <div className="p-5 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
                   <p className="text-sm text-[#808897] font-medium">Status:</p>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-[#FFF4F0] text-[#DE4613] text-xs font-medium">
                     <PendingSparkIcon />

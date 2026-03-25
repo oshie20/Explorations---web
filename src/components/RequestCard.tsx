@@ -20,7 +20,7 @@ export function RequestCard({
     <div className="bg-white border border-[#EDEFF4] flex-1 min-w-0" style={{ borderRadius: "16px", boxShadow: "0 2px 2px rgba(0,0,0,0.02)" }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-[#EDEFF4]">
-        <h3 className="text-base font-semibold text-[#272835]">{title}</h3>
+        <h3 className="text-base font-medium text-[#272835]">{title}</h3>
         <div className="flex items-center gap-2">
           <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#EDEFF4] hover:bg-[#f4f5f8] transition-colors">
             <Add size={16} color="#808897" />
@@ -34,8 +34,8 @@ export function RequestCard({
       {/* Stats row */}
       <div className="px-4 sm:px-5 py-4 sm:py-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-[#808897]">Submitted</p>
-          <p className="text-lg font-bold text-[#272835]">
+          <p className="text-sm text-[#808897]" style={{ fontWeight: 500 }}>Submitted</p>
+          <p className="text-lg font-medium text-[#272835]">
             <AnimatedNumber value={String(submitted.count)} duration={2000} />
           </p>
           <p className="text-sm text-[#808897] font-medium">
@@ -43,8 +43,8 @@ export function RequestCard({
           </p>
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-[#808897]">Pending approval</p>
-          <p className="text-lg font-bold text-[#272835]">
+          <p className="text-sm text-[#808897]" style={{ fontWeight: 500 }}>Pending approval</p>
+          <p className="text-lg font-medium text-[#272835]">
             <AnimatedNumber value={String(pending.count)} duration={2000} />
           </p>
           <p className="text-sm text-[#808897] font-medium">
@@ -52,8 +52,8 @@ export function RequestCard({
           </p>
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-[#808897]">Overdue</p>
-          <p className="text-lg font-bold text-[#272835]">
+          <p className="text-sm text-[#808897]" style={{ fontWeight: 500 }}>Overdue</p>
+          <p className="text-lg font-medium text-[#272835]">
             <AnimatedNumber value={String(overdue.count)} duration={2000} />
           </p>
           <p className="text-sm text-[#808897] font-medium">
@@ -68,7 +68,7 @@ export function RequestCard({
       {/* Footer */}
       <div className="px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-0.5">
-          <p className="text-[#808897]" style={{ fontSize: "14px" }}>Total requests</p>
+          <p className="text-[#808897] font-normal" style={{ fontSize: "14px" }}>Total requests</p>
           <div className="flex items-center gap-2 text-[#272835] font-medium" style={{ fontSize: "16px" }}>
             <span>
               <AnimatedNumber value={`${total.count} requests`} duration={2000} />

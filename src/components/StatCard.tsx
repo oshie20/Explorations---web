@@ -60,8 +60,8 @@ export function StatCard({ icon, label, value }: StatCardProps) {
         {icon}
       </div>
       <div className="space-y-1">
-        <p className="text-[#808897]" style={{ fontSize: "14px", fontWeight: 600 }}>{label}</p>
-        <p className="font-semibold text-[#272835] tracking-tight" style={{ fontSize: "18px" }}>
+        <p className="text-[#808897]" style={{ fontSize: "14px", fontWeight: 500 }}>{label}</p>
+        <p className="font-medium text-[#272835] tracking-tight" style={{ fontSize: "18px" }}>
           <AnimatedNumber value={value} duration={2000} />
         </p>
       </div>
