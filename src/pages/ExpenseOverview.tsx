@@ -31,6 +31,30 @@ import { RequestCard } from "@/components/RequestCard";
 import { PendingTable } from "@/components/PendingTable";
 
 export function ExpenseOverview() {
+  const statCards = [
+    { icon: <StatCardIcons.moneySendCircle />, label: "Total Spend", value: "$35,000.00" },
+    { icon: <StatCardIcons.checkmarkCircle02 />, label: "Approved (Unpaid)", value: "$8,420.00" },
+    { icon: <StatCardIcons.loading01 />, label: "Pending approval", value: "17 requests" },
+    { icon: <StatCardIcons.clock01 />, label: "Overdue", value: "24 requests" },
+  ];
+
+  const requestCards = [
+    {
+      title: "Expense requests",
+      submitted: { count: 27, amount: "$3,600" },
+      pending: { count: 11, amount: "$2,450" },
+      overdue: { count: 20, amount: "$1,970" },
+      total: { count: 58, amount: "$8,020" },
+    },
+    {
+      title: "Reimbursement requests",
+      submitted: { count: 14, amount: "$2,850" },
+      pending: { count: 6, amount: "$2,850" },
+      overdue: { count: 4, amount: "$2,850" },
+      total: { count: 24, amount: "$8,420" },
+    },
+  ];
+
   return (
     <div className="flex-1 min-h-0 flex flex-col mx-2 sm:mx-4 lg:mx-0 lg:mr-3" style={{ background: "white", border: "1px solid #EDEFF4", borderRadius: "24px 24px 0 0", overflow: "hidden" }}>
       <div className="flex-1 min-h-0 overflow-y-auto w-full">
@@ -57,44 +81,26 @@ export function ExpenseOverview() {
 
         {/* Stat cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ gap: "24px" }}>
-          <StatCard
-            icon={<StatCardIcons.moneySendCircle />}
-            label="Total Spend"
-            value="$35,000.00"
-          />
-          <StatCard
-            icon={<StatCardIcons.checkmarkCircle02 />}
-            label="Approved (Unpaid)"
-            value="$8,420.00"
-          />
-          <StatCard
-            icon={<StatCardIcons.loading01 />}
-            label="Pending approval"
-            value="17 requests"
-          />
-          <StatCard icon={<StatCardIcons.clock01 />} label="Overdue" value="24 requests" />
+          {statCards.map((card, i) => (
+            <div key={card.label} className="reveal-card" style={{ animationDelay: `${i * 120}ms` }}>
+              <StatCard icon={card.icon} label={card.label} value={card.value} />
+            </div>
+          ))}
         </div>
 
         {/* Request cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: "24px" }}>
-          <RequestCard
-            title="Expense requests"
-            submitted={{ count: 27, amount: "$3,600" }}
-            pending={{ count: 11, amount: "$2,450" }}
-            overdue={{ count: 20, amount: "$1,970" }}
-            total={{ count: 58, amount: "$8,020" }}
-          />
-          <RequestCard
-            title="Reimbursement requests"
-            submitted={{ count: 14, amount: "$2,850" }}
-            pending={{ count: 6, amount: "$2,850" }}
-            overdue={{ count: 4, amount: "$2,850" }}
-            total={{ count: 24, amount: "$8,420" }}
-          />
+          {requestCards.map((card, j) => (
+            <div key={card.title} className="reveal-card" style={{ animationDelay: `${(statCards.length + j) * 120}ms` }}>
+              <RequestCard {...card} />
+            </div>
+          ))}
         </div>
 
         {/* Pending requests table */}
-        <PendingTable />
+        <div className="reveal-card" style={{ animationDelay: `${(statCards.length + requestCards.length) * 120}ms` }}>
+          <PendingTable />
+        </div>
       </div>
       </div>
     </div>

@@ -51,7 +51,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         >
           <MenuIcon />
         </button>
-        <div className="relative flex items-center min-w-0 flex-1 max-w-xs sm:max-w-none sm:w-64">
+        <div className="relative flex items-center min-w-0 w-[250px] flex-none">
           <SearchNormal1
             size={15}
             color="#808897"

@@ -36,28 +36,28 @@ export function RequestCard({
         <div className="space-y-1">
           <p className="text-sm font-semibold text-[#808897]">Submitted</p>
           <p className="text-lg font-bold text-[#272835]">
-            <AnimatedNumber value={String(submitted.count)} duration={1500} />
+            <AnimatedNumber value={String(submitted.count)} duration={2000} />
           </p>
           <p className="text-sm text-[#808897] font-medium">
-            <AnimatedNumber value={submitted.amount} duration={1500} />
+            <AnimatedNumber value={submitted.amount} duration={2000} />
           </p>
         </div>
         <div className="space-y-1">
           <p className="text-sm font-semibold text-[#808897]">Pending approval</p>
           <p className="text-lg font-bold text-[#272835]">
-            <AnimatedNumber value={String(pending.count)} duration={1500} />
+            <AnimatedNumber value={String(pending.count)} duration={2000} />
           </p>
           <p className="text-sm text-[#808897] font-medium">
-            <AnimatedNumber value={pending.amount} duration={1500} />
+            <AnimatedNumber value={pending.amount} duration={2000} />
           </p>
         </div>
         <div className="space-y-1">
           <p className="text-sm font-semibold text-[#808897]">Overdue</p>
           <p className="text-lg font-bold text-[#272835]">
-            <AnimatedNumber value={String(overdue.count)} duration={1500} />
+            <AnimatedNumber value={String(overdue.count)} duration={2000} />
           </p>
           <p className="text-sm text-[#808897] font-medium">
-            <AnimatedNumber value={overdue.amount} duration={1500} />
+            <AnimatedNumber value={overdue.amount} duration={2000} />
           </p>
         </div>
       </div>
@@ -71,11 +71,11 @@ export function RequestCard({
           <p className="text-[#808897]" style={{ fontSize: "14px" }}>Total requests</p>
           <div className="flex items-center gap-2 text-[#272835] font-medium" style={{ fontSize: "16px" }}>
             <span>
-              <AnimatedNumber value={`${total.count} requests`} duration={1500} />
+              <AnimatedNumber value={`${total.count} requests`} duration={2000} />
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-[#EDEFF4] inline-block" />
             <span>
-              <AnimatedNumber value={total.amount} duration={1500} />
+              <AnimatedNumber value={total.amount} duration={2000} />
             </span>
           </div>
         </div>

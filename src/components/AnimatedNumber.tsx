@@ -61,7 +61,8 @@ function formatNumber(
     }
     return fixed;
   }
-  const intVal = Math.round(value);
+  // For integer targets, avoid early snapping: only reach the final integer at the very end.
+  const intVal = Math.floor(value);
   if (addCommas) {
     return intVal.toLocaleString();
   }

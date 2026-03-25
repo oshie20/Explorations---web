@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Ease-out: fast at start, slower at end
- * Using cubic ease-out: 1 - (1 - t)^3
+ * Using quint ease-out: 1 - (1 - t)^5
  */
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
+function easeOutQuint(t: number): number {
+  return 1 - Math.pow(1 - t, 5);
 }
 
 interface UseCountUpOptions {
@@ -50,7 +50,7 @@ export function useCountUp(
         function tick(now: number) {
           const elapsed = now - startTime;
           const progress = Math.min(elapsed / duration, 1);
-          const eased = easeOutCubic(progress);
+          const eased = easeOutQuint(progress);
           const current = startValue + (target - startValue) * eased;
           setValue(current);
 
