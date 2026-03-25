@@ -25,16 +25,20 @@
   --color-status-pending-text: #c2660a;
   --color-status-pending-icon: #f97316;
 
-  --font-family-sans: "Inter", "Avenir LT Pro", system-ui, sans-serif;
+  --font-family-sans: "Geist", "Avenir LT Pro", system-ui, sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  font-family: "Geist", "Avenir LT Pro", system-ui, sans-serif !important;
+}
+
 body {
   margin: 0;
-  font-family: var(--font-family-sans);
+  font-family: "Geist", "Avenir LT Pro", system-ui, sans-serif !important;
   background-color: #f4f5f8;
   color: #272835;
   -webkit-font-smoothing: antialiased;

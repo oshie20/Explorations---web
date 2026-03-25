@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 function InvoiceIcon() {
   return (
@@ -31,18 +32,9 @@ function LaptopIcon() {
   );
 }
 
-function Loading03Icon() {
+function PendingSparkIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeLinecap="round" className="animate-spin shrink-0">
-      <path d="M8 2V4" />
-      <path d="M8 12V14" />
-      <path d="M14 8H12" />
-      <path d="M4 8H2" />
-      <path d="M12.2423 3.75781L10.8281 5.17203" />
-      <path d="M5.17203 10.8281L3.75781 12.2423" />
-      <path d="M12.2423 12.2423L10.8281 10.8281" />
-      <path d="M5.17203 5.17203L3.75781 3.75781" />
-    </svg>
+    <img src="/loading-03.svg" alt="" width={12} height={12} className="shrink-0" />
   );
 }
 
@@ -134,6 +126,26 @@ const categoryIcon: Record<Category, React.ReactNode> = {
   Other: <DashboardSquareIcon />,
 };
 
+function avatarForRequester(requester: string) {
+  // Map row requester -> Figma avatar images (copied into /public).
+  switch (requester) {
+    case "olivia.harris@designhub.com":
+      return "/avatar-olivia.png";
+    case "ziar@designhub.com":
+      return "/avatar-ziar.png";
+    case "marcus.james@designhub.com":
+      return "/avatar-marcus.png";
+    case "sophia.kim@designhub.com":
+      return "/avatar-sophia.png";
+    case "liam.watson@designhub.com":
+      return "/avatar-liam.png";
+    case "ava.smith@designhub.com":
+      return "/avatar-ava.png";
+    default:
+      return null;
+  }
+}
+
 export function PendingTable() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<TableRow | null>(null);
@@ -158,6 +170,103 @@ export function PendingTable() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [detailsOpen]);
+
+  function formatOrdinal(day: number): string {
+    if (day % 100 >= 11 && day % 100 <= 13) return `${day}th`;
+    const mod = day % 10;
+    if (mod === 1) return `${day}st`;
+    if (mod === 2) return `${day}nd`;
+    if (mod === 3) return `${day}rd`;
+    return `${day}th`;
+  }
+
+  function formatDueDate(dateStr: string): string {
+    // dateStr like "1/31/26" or "1/01/26"
+    const parts = dateStr.split("/").map((p) => Number(p));
+    if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return dateStr;
+    const [a, b, c] = parts;
+    // Heuristic: if first part > 12, it's day/month/year; else month/day/year.
+    const month = a > 12 ? b : a;
+    const day = a > 12 ? a : b;
+    const year = 2000 + c;
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const m = monthNames[Math.max(0, Math.min(monthNames.length - 1, month - 1))] ?? "—";
+    return `${m} ${formatOrdinal(day)}, ${year}`;
+  }
+
+  function formatRequesterName(email: string): string {
+    // "olivia.harris@designhub.com" -> "Olivia harris"
+    const local = email.split("@")[0] ?? email;
+    const pieces = local.split(/[._-]/g).filter(Boolean);
+    if (pieces.length === 0) return local;
+    const first = pieces[0].slice(0, 1).toUpperCase() + pieces[0].slice(1);
+    const rest = pieces.slice(1).join(" ").toLowerCase();
+    return rest ? `${first} ${rest}` : first;
+  }
+
+  function parseCurrencyAmount(v: string): number {
+    // "$1,240.00" -> 1240
+    const cleaned = v.replace(/[^0-9.]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function hashString(s: string): number {
+    // Deterministic lightweight hash for stable IDs.
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (h << 5) - h + s.charCodeAt(i);
+      h |= 0; // force 32-bit
+    }
+    return Math.abs(h);
+  }
+
+  function buildExpenseId(row: TableRow): string {
+    const base = `${row.date}|${row.requester}|${row.amount}|${row.type}|${row.category}`;
+    const n = hashString(base) % 100000000; // 8 digits
+    return `EXP ${String(n).padStart(8, "0")}`;
+  }
+
+  const expenseId = selectedRow ? buildExpenseId(selectedRow) : "";
+  const dueDate = selectedRow ? formatDueDate(selectedRow.date) : "";
+  const requesterName = selectedRow ? formatRequesterName(selectedRow.requester) : "";
+
+  const breakdownItems = selectedRow
+    ? (() => {
+        const total = parseCurrencyAmount(selectedRow.amount);
+        const round2 = (x: number) => Math.round(x * 100) / 100;
+
+        // Allocate the total across 3 line items, and keep qty consistent with the UI.
+        const laborUnit = round2(total * 0.2); // Labor x 1
+        const airUnit = round2((total * 0.2) / 4); // Air filter x 4
+        const thermostatUnit = round2(total - laborUnit - airUnit * 4); // Remaining x 1
+
+        return [
+          { name: "Thermostat replacement", unit: thermostatUnit, qty: 1 },
+          { name: "Air filter replacement", unit: airUnit, qty: 4 },
+          { name: "Labor", unit: laborUnit, qty: 1 },
+        ];
+      })()
+    : [];
+
+  const notesText =
+    selectedRow?.category === "Travel"
+      ? "HVAC unit is not cooling properly. Technician recommended filter replacement and thermostat upgrade."
+      : selectedRow?.category === "Utilities"
+        ? "Equipment requires servicing. Maintenance scheduled and parts will be replaced as needed."
+        : selectedRow?.category === "Event"
+          ? "Request includes installation/testing. Technician will confirm system performance after completion."
+          : selectedRow?.category === "Software"
+            ? "License renewal and configuration updates pending approval."
+            : "Maintenance activity pending approval.";
+
+  const attachments =
+    selectedRow?.type === "Expense"
+      ? ["invoice.jpeg", "invoice.jpeg"]
+      : ["receipt.jpeg"];
+
+  const approveLabel = selectedRow?.type === "Expense" ? "Approve Expense" : "Approve Reimbursement";
+  const rejectLabel = selectedRow?.type === "Expense" ? "Reject expense" : "Reject reimbursement";
 
   return (
     <div className="bg-white overflow-hidden" style={{ borderRadius: "16px", boxShadow: "0 2px 2px rgba(0,0,0,0.02)" }}>
@@ -222,12 +331,20 @@ export function PendingTable() {
                 <td className="px-3 sm:px-4 py-3 sm:py-4 text-[#272835] text-xs sm:text-sm">{row.date}</td>
                 <td className="px-3 sm:px-4 py-3 sm:py-4">
                   <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-                      style={{ backgroundColor: row.color }}
-                    >
-                      {row.initials}
-                    </div>
+                    {avatarForRequester(row.requester) ? (
+                      <img
+                        src={avatarForRequester(row.requester) as string}
+                        alt={row.requester}
+                        className="w-7 h-7 rounded-full object-cover shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+                        style={{ backgroundColor: row.color }}
+                      >
+                        {row.initials}
+                      </div>
+                    )}
                     <span className="text-[#272835] text-xs sm:text-sm truncate max-w-[140px] sm:max-w-none">{row.requester}</span>
                   </div>
                 </td>
@@ -242,8 +359,8 @@ export function PendingTable() {
                   </span>
                 </td>
                 <td className="px-3 sm:px-4 py-3 sm:py-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-orange-50 text-orange-600 text-xs font-medium">
-                    <Loading03Icon />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-[#FFF4F0] text-[#DE4613] text-xs font-medium">
+                    <PendingSparkIcon />
                     Pending
                   </span>
                 </td>
@@ -266,98 +383,156 @@ export function PendingTable() {
       </div>
 
       {/* Details drawer */}
-      {detailsOpen && selectedRow && (
-        <div className="fixed inset-0 z-50">
+      {detailsOpen && selectedRow && createPortal(
+        <div className="fixed inset-0 z-[200]">
           <div
-            className="absolute inset-0 bg-black/40"
+            className="fixed inset-0 bg-black/40"
             onClick={closeDetails}
             aria-hidden
           />
           <div
-            className="absolute inset-x-0 bottom-0 bg-white border-t border-[#EDEFF4] max-h-[85vh] overflow-y-auto rounded-t-2xl md:inset-y-0 md:bottom-0 md:top-0 md:right-0 md:left-auto md:w-[440px] md:rounded-none"
+            className="fixed top-0 bottom-0 right-0 bg-white border-l border-[#EDEFF4] w-full overflow-y-auto md:w-[520px] md:rounded-none"
             role="dialog"
             aria-modal="true"
           >
-            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[#EDEFF4]">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-lg bg-[#f4f5f8] flex items-center justify-center text-[#272835]">
-                  {categoryIcon[selectedRow.category]}
+            <div className="px-4 sm:px-6 py-4 border-b border-[#EDEFF4]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-[#272835]">Expense details</h3>
+                  <p className="text-xs text-[#808897] font-medium mt-1">{expenseId}</p>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm text-[#808897] font-medium">Request</p>
-                  <h3 className="text-base font-semibold text-[#272835] truncate">
-                    {selectedRow.type} request
-                  </h3>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={closeDetails}
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-[#808897] hover:bg-[#f4f5f8] transition-colors"
-                aria-label="Close details"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="px-4 sm:px-6 py-4 space-y-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-orange-50 text-orange-600 text-xs font-medium">
-                  <Loading03Icon />
-                  Pending
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-[#808897] font-medium">Date</p>
-                  <p className="text-[#272835] font-semibold">{selectedRow.date}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-[#808897] font-medium">Requester</p>
-                  <p className="text-[#272835] font-semibold truncate">{selectedRow.requester}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-[#808897] font-medium">Type</p>
-                  <p className="text-[#272835] font-semibold">{selectedRow.type}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-[#808897] font-medium">Amount</p>
-                  <p className="text-[#272835] font-semibold">{selectedRow.amount}</p>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-sm text-[#808897] font-medium">Category</p>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-[#f4f5f8] text-[#272835] text-xs font-medium">
-                  {categoryIcon[selectedRow.category]}
-                  {selectedRow.category}
-                </span>
-              </div>
-
-              {/* Optional actions - hook up later */}
-              <div className="pt-2 flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  className="flex-1 inline-flex items-center justify-center min-h-[44px] rounded-lg bg-[#3e50f7] text-white text-sm font-medium hover:bg-[#6573f9] transition-colors"
+                  onClick={closeDetails}
+                  className="w-10 h-10 flex items-center justify-center text-[#808897] hover:bg-[#f4f5f8] transition-colors rounded-lg"
+                  aria-label="Close details"
                 >
-                  Approve
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="px-4 sm:px-6 py-4 space-y-5 pb-8">
+              {/* Total amount + breakdown */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-[#808897] font-medium">Total amount</p>
+                  <p className="text-sm font-semibold text-[#272835]">{selectedRow.amount}</p>
+                </div>
+
+                <div className="border border-[#EDEFF4] rounded-[14px] bg-[#FAFBFD] p-4">
+                  <div className="space-y-3">
+                    {breakdownItems.map((it) => (
+                      <div key={it.name} className="space-y-1">
+                        <p className="text-sm text-[#272835]">{it.name}</p>
+                        <p className="text-sm font-medium text-[#272835]">
+                          {it.unit.toLocaleString(undefined, { style: "currency", currency: "USD" })} x {it.qty}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Type / Due date / Requested by / Category / Status */}
+              <div className="border border-[#EDEFF4] rounded-lg overflow-hidden">
+                <div className="px-4 py-4 flex items-center justify-between bg-white">
+                  <p className="text-sm text-[#808897] font-medium">Type:</p>
+                  <p className="text-sm font-semibold text-[#272835]">{selectedRow.type}</p>
+                </div>
+                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                  <p className="text-sm text-[#808897] font-medium">Due date:</p>
+                  <p className="text-sm font-semibold text-[#272835]">{dueDate}</p>
+                </div>
+                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                  <p className="text-sm text-[#808897] font-medium">Requested by:</p>
+                  <div className="flex items-center gap-2">
+                    {avatarForRequester(selectedRow.requester) ? (
+                      <img
+                        src={avatarForRequester(selectedRow.requester) as string}
+                        alt={selectedRow.requester}
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-semibold"
+                        style={{ backgroundColor: selectedRow.color }}
+                      >
+                        {selectedRow.initials}
+                      </div>
+                    )}
+                    <p className="text-sm font-semibold text-[#272835] whitespace-nowrap">{requesterName}</p>
+                  </div>
+                </div>
+                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                  <p className="text-sm text-[#808897] font-medium">Category:</p>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-[#F4F5F8] text-[#272835] text-xs font-medium">
+                    {categoryIcon[selectedRow.category]}
+                    {selectedRow.category}
+                  </span>
+                </div>
+                <div className="px-4 py-4 flex items-center justify-between bg-white border-t border-[#EDEFF4]">
+                  <p className="text-sm text-[#808897] font-medium">Status:</p>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] bg-[#FFF4F0] text-[#DE4613] text-xs font-medium">
+                    <PendingSparkIcon />
+                    Pending
+                  </span>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <p className="text-sm text-[#808897] font-medium">Notes</p>
+                <div className="border border-[#EDEFF4] rounded-lg p-4 bg-white">
+                  <p className="text-sm text-[#272835] leading-5">
+                    {notesText}
+                  </p>
+                </div>
+              </div>
+
+              {/* Attachments */}
+              <div className="space-y-2">
+                <p className="text-sm text-[#272835] font-medium">Attachments</p>
+                <div className="flex flex-wrap gap-3">
+                  {attachments.map((name, idx) => (
+                    <button
+                      key={`${name}-${idx}`}
+                      type="button"
+                      className="flex items-center gap-2 bg-[#F4F5F8] border border-transparent rounded-lg px-3 py-2 text-sm text-[#272835]"
+                    >
+                      <img src="/group-2.svg" alt="" width="16" height="16" />
+                      <span className="font-medium">{name}</span>
+                      <span className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded-lg text-[#808897]">
+                        <img src="/download-circle-01.svg" alt="" width="16" height="16" />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-3 pt-3">
+                <button
+                  type="button"
+                  className="min-h-[44px] rounded-lg border border-[#EDEFF4] text-[#DF1C41] text-sm font-semibold hover:bg-[#f4f5f8] transition-colors"
+                >
+                  {rejectLabel}
                 </button>
                 <button
                   type="button"
-                  className="flex-1 inline-flex items-center justify-center min-h-[44px] rounded-lg border border-[#EDEFF4] text-[#272835] text-sm font-medium hover:bg-[#f4f5f8] transition-colors"
+                  className="min-h-[44px] rounded-lg bg-[#3e50f7] text-white text-sm font-semibold hover:bg-[#6573f9] transition-colors"
                 >
-                  Reject
+                  {approveLabel}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      , document.body!)}
     </div>
   );
 }

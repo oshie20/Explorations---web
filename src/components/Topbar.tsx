@@ -101,7 +101,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
         {/* Avatar */}
         <img
-          src="/@fs/Users/user/Downloads/Avatar/32px.svg"
+          src="/avatar.svg"
           alt="User"
           className="w-10 h-10 rounded-full object-cover shrink-0"
         />

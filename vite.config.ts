@@ -8,7 +8,13 @@ export default defineConfig({
   server: {
     fs: {
       // Allow serving the locally stored avatar file via "/@fs/..."
-      allow: ["/Users/user/Downloads/Avatar"],
+      allow: [
+        "/Users/user/Downloads/Avatar",
+        // Keep the project itself accessible (Vite uses "/@fs/..." behind the scenes).
+        __dirname,
+        // And node_modules explicitly (some requests resolve into node_modules paths).
+        path.resolve(__dirname, "node_modules"),
+      ],
     },
   },
   resolve: {
