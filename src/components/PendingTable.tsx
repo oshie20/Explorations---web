@@ -146,6 +146,103 @@ function avatarForRequester(requester: string) {
   }
 }
 
+function getNotesAndAttachments(row: TableRow): { notesText: string; attachments: string[] } {
+  const handle = row.requester.split("@")[0]?.replace(/\./g, "_") ?? "requester";
+
+  const byCategory: Record<
+    Category,
+    { expense: { notes: string; files: string[] }; reimbursement: { notes: string; files: string[] } }
+  > = {
+    Travel: {
+      expense: {
+        notes:
+          "Round-trip LAX–SFO for the February product sync. Corporate rate at the Marriott Financial District; no per diem claimed. Trip aligns with the approved travel calendar for Design.",
+        files: [
+          `itinerary_${handle}_united.pdf`,
+          "hotel_folio_marriott.pdf",
+          "corp_card_authorization.png",
+        ],
+      },
+      reimbursement: {
+        notes:
+          "Same-day return flight change after the client workshop ran over. Paid on a personal card because the corporate portal timed out. Full itinerary and fare difference receipt attached.",
+        files: [
+          "flight_change_receipt.pdf",
+          `boarding_pass_${handle}.pdf`,
+          "expense_policy_ack.txt",
+        ],
+      },
+    },
+    Utilities: {
+      expense: {
+        notes:
+          "Quarterly HVAC service for the downtown office (Suite 400). Includes filter swap, refrigerant check, and written compliance summary for facilities. PO reference: FAC-UTIL-2026-Q1.",
+        files: ["service_contract_summary.pdf", `work_order_signed_${handle}.pdf`, "vendor_W9.pdf"],
+      },
+      reimbursement: {
+        notes:
+          "Emergency after-hours leak repair at the WeHo satellite—building management required immediate payment on site. Technician left a stamped completion slip; photos of the work area included.",
+        files: [
+          "after_hours_invoice.pdf",
+          "technician_completion_slip.jpg",
+          `site_photos_${handle}.zip`,
+        ],
+      },
+    },
+    Event: {
+      expense: {
+        notes:
+          "Deposit for the Q1 leadership offsite: venue hold, basic A/V package, and room block release terms. Final balance is due fourteen days before the event; cancellation policy is in the contract rider.",
+        files: ["venue_contract_offsite.pdf", "deposit_wire_confirmation.pdf", "event_run_of_show_draft.docx"],
+      },
+      reimbursement: {
+        notes:
+          "Rush printing and foam-core signage for the partner summit—the vendor could not invoice Stratus directly on short notice. Line items match the approved mockups in the brand folder.",
+        files: [
+          `print_invoice_vista_${handle}.pdf`,
+          "signage_proofs.png",
+          "delivery_confirmation.pdf",
+        ],
+      },
+    },
+    Software: {
+      expense: {
+        notes:
+          "Annual design-tool renewal (15 seats). Procurement ticket is filed under STR-8821; this matches last year’s seat count plus two net-new hires in Product Design.",
+        files: ["vendor_quote_signed.pdf", "seat_allocation_q1.csv", "order_confirmation_email.eml"],
+      },
+      reimbursement: {
+        notes:
+          "Temporary upgrade on a personal Figma plan during the design jam week. Org license migration is scheduled for next billing cycle—this submission covers the gap only.",
+        files: [
+          `personal_invoice_figma_${handle}.pdf`,
+          "screenshot_account_seats.png",
+        ],
+      },
+    },
+    Other: {
+      expense: {
+        notes:
+          "Facilities OPEX purchase: ergonomic monitor arms and cable kits for the hot-desk pods. Receipt shows tax breakdown; items match the approved facilities punch list from Jan 12.",
+        files: ["supplier_invoice_amazon_business.pdf", `packing_slip_${handle}.pdf`],
+      },
+      reimbursement: {
+        notes:
+          "FedEx overnight and Saturday pickup for the board deck print run. Cardholder submitted itemized receipts; shipping tied to the Jan board meeting materials package.",
+        files: [
+          "fedex_commercial_invoice.pdf",
+          `shipping_labels_${handle}.pdf`,
+          "itemized_card_receipt.pdf",
+        ],
+      },
+    },
+  };
+
+  const bucket = row.type === "Expense" ? "expense" : "reimbursement";
+  const { notes, files } = byCategory[row.category][bucket];
+  return { notesText: notes, attachments: files };
+}
+
 export function PendingTable() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [drawerMounted, setDrawerMounted] = useState(false);
@@ -285,21 +382,9 @@ export function PendingTable() {
       })()
     : [];
 
-  const notesText =
-    selectedRow?.category === "Travel"
-      ? "HVAC unit is not cooling properly. Technician recommended filter replacement and thermostat upgrade."
-      : selectedRow?.category === "Utilities"
-        ? "Equipment requires servicing. Maintenance scheduled and parts will be replaced as needed."
-        : selectedRow?.category === "Event"
-          ? "Request includes installation/testing. Technician will confirm system performance after completion."
-          : selectedRow?.category === "Software"
-            ? "License renewal and configuration updates pending approval."
-            : "Maintenance activity pending approval.";
-
-  const attachments =
-    selectedRow?.type === "Expense"
-      ? ["invoice.jpeg", "invoice.jpeg"]
-      : ["receipt.jpeg"];
+  const { notesText, attachments } = selectedRow
+    ? getNotesAndAttachments(selectedRow)
+    : { notesText: "", attachments: [] as string[] };
 
   const approveLabel = selectedRow?.type === "Expense" ? "Approve Expense" : "Approve Reimbursement";
   const rejectLabel = selectedRow?.type === "Expense" ? "Reject expense" : "Reject reimbursement";
@@ -420,10 +505,10 @@ export function PendingTable() {
 
       {/* Details drawer */}
       {drawerMounted && selectedRow && createPortal(
-        <div className="fixed inset-0 z-[200]">
+        <div className="fixed inset-0 z-[200] isolate">
           <div
             className={
-              "fixed inset-0 bg-black/40 transition-opacity duration-[430ms] ease-[cubic-bezier(0.22,1,0.36,1)] " +
+              "fixed inset-0 z-0 bg-black/40 transition-opacity duration-[430ms] ease-[cubic-bezier(0.22,1,0.36,1)] " +
               (detailsOpen ? "opacity-100" : "opacity-0 pointer-events-none")
             }
             onClick={closeDetails}
@@ -431,14 +516,14 @@ export function PendingTable() {
           />
           <div
             className={
-              "fixed top-0 bottom-0 right-0 bg-white border-l border-[#EDEFF4] w-full overflow-y-auto md:w-[520px] md:rounded-none " +
+              "fixed top-0 bottom-0 right-0 z-10 flex h-full max-h-[100dvh] w-full flex-col overflow-hidden bg-white border-l border-[#EDEFF4] md:w-[520px] md:rounded-none " +
               "transform transition-all duration-[430ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform " +
               (detailsOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0")
             }
             role="dialog"
             aria-modal="true"
           >
-            <div className="px-4 sm:px-6 py-4 border-b border-[#EDEFF4]">
+            <div className="shrink-0 border-b border-[#EDEFF4] px-4 py-4 sm:px-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-base font-semibold text-[#272835]">Expense details</h3>
@@ -459,6 +544,7 @@ export function PendingTable() {
               </div>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]">
             <div className="px-4 sm:px-6 py-4 space-y-5 pb-8">
               {/* Total amount + breakdown + Type/Due/Requested (combined card) */}
               <div className="border border-[#EDEFF4] rounded-[14px] overflow-hidden bg-white">
@@ -468,7 +554,7 @@ export function PendingTable() {
                     <p className="text-sm font-semibold text-[#272835]">{selectedRow.amount}</p>
                   </div>
 
-                  <div className="mt-3 rounded-[14px] bg-[#FAFBFD] p-4">
+                  <div className="mt-3 rounded-[14px] bg-[#FAFBFD] p-4 border border-[#EDEFF4]">
                     <div className="space-y-3">
                       {breakdownItems.map((it) => (
                         <div key={it.name} className="space-y-1">
@@ -568,11 +654,21 @@ export function PendingTable() {
                 </button>
                 <button
                   type="button"
-                  className="min-h-[44px] rounded-lg bg-[#3e50f7] text-white text-sm font-semibold hover:bg-[#6573f9] transition-colors"
+                  className="inline-flex items-center justify-center w-full min-h-[44px] text-white text-sm font-medium transition-opacity hover:opacity-90"
+                  style={{
+                    padding: "0 18px",
+                    cursor: "pointer",
+                    borderRadius: "12px",
+                    border: "1px solid #6573F9",
+                    background:
+                      "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.00) 100%), linear-gradient(355deg, #625AFF 3.89%, #645CFF 95.37%)",
+                    boxShadow: "none",
+                  }}
                 >
                   {approveLabel}
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>
