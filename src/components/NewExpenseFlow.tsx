@@ -146,7 +146,6 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
   const [step, setStep] = useState<Step>("new");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dueOpen, setDueOpen] = useState(false);
-  const [categoryOverridden, setCategoryOverridden] = useState(false);
   const [categoryError, setCategoryError] = useState(false);
   const categoryRef = useRef<HTMLDivElement | null>(null);
   const dueRef = useRef<HTMLDivElement | null>(null);
@@ -176,7 +175,6 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
   useEffect(() => {
     if (!open) {
       setStep("new");
-      setCategoryOverridden(false);
       setCategoryError(false);
       return;
     }
@@ -190,7 +188,6 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
         description: initialDraft.description,
         attachments: initialDraft.attachments,
       });
-      setCategoryOverridden(true);
     }
   }, [open, initialDraft]);
 
@@ -513,7 +510,6 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
                         type="button"
                         onClick={() => {
                           setDraft((prev) => ({ ...prev, category }));
-                          setCategoryOverridden(true);
                           setCategoryError(false);
                           setCategoryOpen(false);
                         }}
@@ -533,7 +529,6 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
                         type="button"
                         onClick={() => {
                           setDraft((prev) => ({ ...prev, category: suggested }));
-                          setCategoryOverridden(true);
                           setCategoryError(false);
                         }}
                         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs border ${
