@@ -26,11 +26,58 @@ function FilterLinesIcon() {
   );
 }
 
+import { useEffect, useState } from "react";
 import { StatCard, StatCardIcons } from "@/components/StatCard";
 import { RequestCard } from "@/components/RequestCard";
 import { PendingTable } from "@/components/PendingTable";
+import { NewExpenseFlow } from "../components/NewExpenseFlow";
+import type { ExpenseDraftData } from "../components/NewExpenseFlow";
 
 export function ExpenseOverview() {
+  const [newExpenseOpen, setNewExpenseOpen] = useState(false);
+  const [drafts, setDrafts] = useState<ExpenseDraftData[]>([]);
+  const [selectedDraft, setSelectedDraft] = useState<ExpenseDraftData | null>(null);
+  const [showSavedToast, setShowSavedToast] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("expense-drafts");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as ExpenseDraftData[];
+      if (Array.isArray(parsed)) setDrafts(parsed);
+    } catch {
+      // Ignore malformed persisted draft payloads.
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("expense-drafts", JSON.stringify(drafts));
+  }, [drafts]);
+
+  useEffect(() => {
+    if (!showSavedToast) return;
+    const timer = window.setTimeout(() => setShowSavedToast(false), 2600);
+    return () => window.clearTimeout(timer);
+  }, [showSavedToast]);
+
+  function handleSaveDraft(draft: ExpenseDraftData) {
+    setDrafts((prev) => {
+      const existingIdx = prev.findIndex((item) => item.id === draft.id);
+      if (existingIdx === -1) return [draft, ...prev];
+      const next = [...prev];
+      next[existingIdx] = draft;
+      return next.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    });
+    setSelectedDraft(null);
+    setShowSavedToast(true);
+    setNewExpenseOpen(false);
+  }
+
+  function handleOpenDraft(draft: ExpenseDraftData) {
+    setSelectedDraft(draft);
+    setNewExpenseOpen(true);
+  }
+
   const statCards = [
     { icon: <StatCardIcons.moneySendCircle />, label: "Total Spend", value: "$35,000.00" },
     { icon: <StatCardIcons.checkmarkCircle02 />, label: "Approved (Unpaid)", value: "$8,420.00" },
@@ -69,7 +116,15 @@ export function ExpenseOverview() {
               <FilterLinesIcon />
               Filters
             </button>
-            <button className="inline-flex items-center gap-1.5 text-white font-medium transition-opacity hover:opacity-90" style={{ height: "40px", padding: "0 18px", fontSize: "14px", cursor: "pointer", borderRadius: "12px", border: "1px solid #6573F9", background: "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.00) 100%), linear-gradient(355deg, #625AFF 3.89%, #645CFF 95.37%)", boxShadow: "none" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDraft(null);
+                setNewExpenseOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 text-white font-medium transition-opacity hover:opacity-90"
+              style={{ height: "40px", padding: "0 18px", fontSize: "14px", cursor: "pointer", borderRadius: "12px", border: "1px solid #6573F9", background: "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.00) 100%), linear-gradient(355deg, #625AFF 3.89%, #645CFF 95.37%)", boxShadow: "none" }}
+            >
               <Add01Icon />
               Add expense
             </button>
@@ -99,10 +154,24 @@ export function ExpenseOverview() {
 
         {/* Pending requests table */}
         <div className="reveal-card" style={{ animationDelay: `${(statCards.length + requestCards.length) * 120}ms` }}>
-          <PendingTable />
+          <PendingTable draftItems={drafts} onOpenDraft={handleOpenDraft} />
         </div>
       </div>
       </div>
+      <NewExpenseFlow
+        open={newExpenseOpen}
+        initialDraft={selectedDraft}
+        onClose={() => {
+          setSelectedDraft(null);
+          setNewExpenseOpen(false);
+        }}
+        onSaveDraft={handleSaveDraft}
+      />
+      {showSavedToast && (
+        <div className="fixed bottom-6 right-6 z-[320] rounded-[12px] border border-[#DFE1E6] bg-white px-4 py-3 text-sm font-medium text-[#272835] shadow-[0_10px_24px_rgba(13,13,18,0.12)]">
+          Expense saved to drafts
+        </div>
+      )}
     </div>
   );
 }

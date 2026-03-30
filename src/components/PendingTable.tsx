@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { ExpenseDraftData } from "./NewExpenseFlow";
 
 function InvoiceIcon() {
   return (
@@ -243,7 +244,13 @@ function getNotesAndAttachments(row: TableRow): { notesText: string; attachments
   return { notesText: notes, attachments: files };
 }
 
-export function PendingTable() {
+interface PendingTableProps {
+  draftItems?: ExpenseDraftData[];
+  onOpenDraft?: (draft: ExpenseDraftData) => void;
+}
+
+export function PendingTable({ draftItems = [], onOpenDraft }: PendingTableProps) {
+  const [activeTab, setActiveTab] = useState("Pending requests");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [selectedRow, setSelectedRow] = useState<TableRow | null>(null);
@@ -393,11 +400,12 @@ export function PendingTable() {
     <div className="bg-white overflow-hidden" style={{ borderRadius: "16px", boxShadow: "0 2px 2px rgba(0,0,0,0.02)" }}>
       {/* Tabs */}
       <div className="flex items-center gap-4 sm:gap-6 border-b border-[#EDEFF4] overflow-x-auto">
-        {["Pending requests", "Reports", "Budget & spending"].map((tab) => (
+        {["Pending requests", "Drafts", "Reports", "Budget & spending"].map((tab) => (
           <button
             key={tab}
+            onClick={() => setActiveTab(tab)}
             className={
-              tab === "Pending requests"
+              tab === activeTab
                 ? "py-3 px-1 text-xs sm:text-sm font-medium text-[#3e50f7] border-b-2 border-[#3e50f7] -mb-px whitespace-nowrap shrink-0"
                 : "py-3 px-1 text-xs sm:text-sm font-normal text-[#808897] hover:text-[#272835] transition-colors whitespace-nowrap shrink-0"
             }
@@ -408,6 +416,7 @@ export function PendingTable() {
       </div>
 
       {/* Table */}
+      {activeTab === "Pending requests" && (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -502,6 +511,60 @@ export function PendingTable() {
           </tbody>
         </table>
       </div>
+      )}
+
+      {activeTab === "Drafts" && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#EDEFF4]">
+                <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-[#272835]">Last updated</th>
+                <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-[#272835]">Amount</th>
+                <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-[#272835]">Category</th>
+                <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-[#272835]">Due date</th>
+                <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-[#272835]">Description</th>
+                <th className="text-left px-3 sm:px-4 py-3 text-xs font-medium text-[#272835]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {draftItems.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-sm text-[#808897]">
+                    No drafts yet. Save one from the new expense flow.
+                  </td>
+                </tr>
+              ) : (
+                draftItems.map((draft, idx) => (
+                  <tr key={`${draft.updatedAt}-${idx}`} className="border-b border-[#EDEFF4] last:border-0">
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-[#272835] text-xs sm:text-sm">
+                      {new Date(draft.updatedAt).toLocaleString()}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-[#272835] text-xs sm:text-sm">
+                      {draft.amount ? `$${draft.amount}` : "$0.00"}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-[#272835] text-xs sm:text-sm">{draft.category}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-[#272835] text-xs sm:text-sm">{draft.dueDate}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-[#272835] text-xs sm:text-sm max-w-[260px] truncate">{draft.description}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4">
+                      <button
+                        type="button"
+                        onClick={() => onOpenDraft?.(draft)}
+                        className="text-xs font-medium text-[#3e50f7] hover:text-[#6573f9] transition-colors px-2 py-1 rounded hover:bg-[#f0f2ff]"
+                      >
+                        Continue
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {(activeTab === "Reports" || activeTab === "Budget & spending") && (
+        <div className="px-4 py-8 text-sm text-[#808897]">No data available in this tab yet.</div>
+      )}
 
       {/* Details drawer */}
       {drawerMounted && selectedRow && createPortal(
@@ -536,10 +599,7 @@ export function PendingTable() {
                   className="w-10 h-10 flex items-center justify-center text-[#808897] hover:bg-[#f4f5f8] transition-colors rounded-lg"
                   aria-label="Close details"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <img src="/x-close.svg" alt="" width="16" height="16" />
                 </button>
               </div>
             </div>
