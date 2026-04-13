@@ -26,18 +26,56 @@ function FilterLinesIcon() {
   );
 }
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StatCard, StatCardIcons } from "@/components/StatCard";
 import { RequestCard } from "@/components/RequestCard";
-import { PendingTable } from "@/components/PendingTable";
+import { PendingTable, seedRows, type DateFilter, type TableRow } from "@/components/PendingTable";
 import { NewExpenseFlow } from "../components/NewExpenseFlow";
 import type { ExpenseDraftData } from "../components/NewExpenseFlow";
 
+function toISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function buildCalendarDays(visibleMonth: Date) {
+  const y = visibleMonth.getFullYear();
+  const m = visibleMonth.getMonth();
+  const first = new Date(y, m, 1);
+  const start = first.getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prevDays = new Date(y, m, 0).getDate();
+  const cells: Array<{ day: number; monthOffset: -1 | 0 | 1; iso: string }> = [];
+  for (let i = 0; i < start; i++) {
+    const day = prevDays - start + i + 1;
+    cells.push({ day, monthOffset: -1, iso: toISODate(new Date(y, m - 1, day)) });
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push({ day, monthOffset: 0, iso: toISODate(new Date(y, m, day)) });
+  }
+  while (cells.length < 42) {
+    const day = cells.length - (start + daysInMonth) + 1;
+    cells.push({ day, monthOffset: 1, iso: toISODate(new Date(y, m + 1, day)) });
+  }
+  return cells;
+}
+
 export function ExpenseOverview() {
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement | null>(null);
   const [drafts, setDrafts] = useState<ExpenseDraftData[]>([]);
+  const [submittedExpenses, setSubmittedExpenses] = useState<TableRow[]>([]);
+  const [recentExpenseRowId, setRecentExpenseRowId] = useState<string | null>(null);
   const [selectedDraft, setSelectedDraft] = useState<ExpenseDraftData | null>(null);
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [showSubmittedToast, setShowSubmittedToast] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>({ type: "90d" });
+  const [draftDateFilter, setDraftDateFilter] = useState<DateFilter>({ type: "90d" });
+  const [customMonth, setCustomMonth] = useState(() => new Date());
+  const [activeDateField, setActiveDateField] = useState<"start" | "end">("start");
 
   useEffect(() => {
     try {
@@ -51,14 +89,51 @@ export function ExpenseOverview() {
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("submitted-expenses");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as TableRow[];
+      if (Array.isArray(parsed)) setSubmittedExpenses(parsed);
+    } catch {
+      // Ignore malformed persisted submitted payloads.
+    }
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem("expense-drafts", JSON.stringify(drafts));
   }, [drafts]);
+
+  useEffect(() => {
+    window.localStorage.setItem("submitted-expenses", JSON.stringify(submittedExpenses));
+  }, [submittedExpenses]);
 
   useEffect(() => {
     if (!showSavedToast) return;
     const timer = window.setTimeout(() => setShowSavedToast(false), 2600);
     return () => window.clearTimeout(timer);
   }, [showSavedToast]);
+
+  useEffect(() => {
+    if (!showSubmittedToast) return;
+    const timer = window.setTimeout(() => setShowSubmittedToast(false), 2600);
+    return () => window.clearTimeout(timer);
+  }, [showSubmittedToast]);
+
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (filterOpen && filterRef.current && !filterRef.current.contains(target)) {
+        setFilterOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    return () => window.removeEventListener("mousedown", onPointerDown);
+  }, [filterOpen]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    setDraftDateFilter(dateFilter);
+  }, [filterOpen, dateFilter]);
 
   function handleSaveDraft(draft: ExpenseDraftData) {
     setDrafts((prev) => {
@@ -77,6 +152,49 @@ export function ExpenseOverview() {
     setSelectedDraft(draft);
     setNewExpenseOpen(true);
   }
+
+  function formatDateMMDDYY(isoDate: string): string {
+    const d = new Date(`${isoDate}T00:00:00`);
+    const mm = String(d.getMonth() + 1);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${mm}/${dd}/${yy}`;
+  }
+
+  function toMoney(amount: string): string {
+    const n = Number(amount.replace(/,/g, ""));
+    const safe = Number.isFinite(n) ? n : 0;
+    return safe.toLocaleString(undefined, { style: "currency", currency: "USD" });
+  }
+
+  function handleSubmitExpense(expense: ExpenseDraftData) {
+    const submittedIso = new Date().toISOString().slice(0, 10);
+    const requester = "you@designhub.com";
+    const rowId = `submitted-${expense.id}`;
+    const nextRow: TableRow = {
+      id: rowId,
+      date: formatDateMMDDYY(submittedIso),
+      dateIso: submittedIso,
+      requester,
+      initials: "YO",
+      color: "#6573f9",
+      type: expense.type === "Reimbursement" ? "Reimbursement" : "Expense",
+      amount: toMoney(expense.amount),
+      category: (expense.category || "Other") as TableRow["category"],
+    };
+    setSubmittedExpenses((prev) => [nextRow, ...prev.filter((row) => row.id !== rowId)]);
+    setRecentExpenseRowId(rowId);
+    setDateFilter({ type: "90d" });
+  }
+
+  const pendingRows = useMemo(() => [...submittedExpenses, ...seedRows], [submittedExpenses]);
+  const filterLabel = useMemo(() => {
+    if (dateFilter.type === "today") return "Today";
+    if (dateFilter.type === "30d") return "Last 30 days";
+    if (dateFilter.type === "90d") return "Last 90 days";
+    return dateFilter.start && dateFilter.end ? `${dateFilter.start} to ${dateFilter.end}` : "Custom range";
+  }, [dateFilter]);
+  const calendarDays = useMemo(() => buildCalendarDays(customMonth), [customMonth]);
 
   const statCards = [
     { icon: <StatCardIcons.moneySendCircle />, label: "Total Spend", value: "$35,000.00" },
@@ -112,10 +230,142 @@ export function ExpenseOverview() {
             Expense Overview
           </h2>
           <div className="flex items-center gap-2 flex-wrap">
-            <button className="flex items-center gap-2 px-4 h-10 text-sm font-medium border border-[#EDEFF4] rounded-lg text-[#272835] hover:bg-[#f4f5f8] transition-colors">
-              <FilterLinesIcon />
-              Filters
-            </button>
+            <div className="relative" ref={filterRef}>
+              <button
+                type="button"
+                onClick={() => setFilterOpen((prev) => !prev)}
+                className="flex items-center gap-2 px-4 h-10 text-sm font-medium border border-[#EDEFF4] rounded-lg text-[#272835] hover:bg-[#f4f5f8] transition-colors"
+              >
+                <FilterLinesIcon />
+                {filterLabel}
+              </button>
+              {filterOpen && (
+                <div className="absolute top-[calc(100%+8px)] left-0 z-20 w-[320px] rounded-xl border border-[#DFE1E6] bg-white p-3 shadow-[0_10px_20px_rgba(13,13,18,0.08)]">
+                  <div className="space-y-2">
+                    {[
+                      { id: "today", label: "Today" },
+                      { id: "30d", label: "Last 30 days" },
+                      { id: "90d", label: "Last 90 days" },
+                      { id: "custom", label: "Custom range" },
+                    ].map((option) => (
+                      <label key={option.id} className="flex items-center gap-2 text-sm text-[#272835] cursor-pointer">
+                        <input
+                          type="radio"
+                          name="date-range"
+                          checked={draftDateFilter.type === option.id}
+                          onChange={() => {
+                            if (option.id === "custom") {
+                              setDraftDateFilter((prev) =>
+                                prev.type === "custom" ? prev : { type: "custom", start: "", end: "" }
+                              );
+                            } else {
+                              setDraftDateFilter({ type: option.id as "today" | "30d" | "90d" });
+                            }
+                          }}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                  {draftDateFilter.type === "custom" && (
+                    <div className="mt-3 pt-3 border-t border-[#EDEFF4] space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveDateField("start")}
+                          className={`h-9 rounded-md border px-2 text-sm text-left ${
+                            activeDateField === "start" ? "border-[#6573F9] bg-[#F6F7FF]" : "border-[#DFE1E6]"
+                          }`}
+                        >
+                          {draftDateFilter.start || "Start date"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveDateField("end")}
+                          className={`h-9 rounded-md border px-2 text-sm text-left ${
+                            activeDateField === "end" ? "border-[#6573F9] bg-[#F6F7FF]" : "border-[#DFE1E6]"
+                          }`}
+                        >
+                          {draftDateFilter.end || "End date"}
+                        </button>
+                      </div>
+                      <div className="rounded-lg border border-[#DFE1E6] p-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <button
+                            type="button"
+                            className="w-7 h-7 rounded-md hover:bg-[#F4F5F8]"
+                            onClick={() => setCustomMonth(new Date(customMonth.getFullYear(), customMonth.getMonth() - 1, 1))}
+                          >
+                            {"<"}
+                          </button>
+                          <p className="text-sm font-medium text-[#272835]">
+                            {customMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                          </p>
+                          <button
+                            type="button"
+                            className="w-7 h-7 rounded-md hover:bg-[#F4F5F8]"
+                            onClick={() => setCustomMonth(new Date(customMonth.getFullYear(), customMonth.getMonth() + 1, 1))}
+                          >
+                            {">"}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-7 gap-1 text-[11px] text-[#808897] mb-1">
+                          {["S", "M", "T", "W", "T", "F", "S"].map((d, idx) => (
+                            <div key={`${d}-${idx}`} className="h-7 flex items-center justify-center">{d}</div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-1">
+                          {calendarDays.map((cell) => (
+                            <button
+                              key={cell.iso}
+                              type="button"
+                              onClick={() => {
+                                setDraftDateFilter((prev) => {
+                                  if (prev.type !== "custom") return { type: "custom", start: cell.iso, end: "" };
+                                  if (activeDateField === "start") return { ...prev, start: cell.iso };
+                                  return { ...prev, end: cell.iso };
+                                });
+                                if (activeDateField === "start") setActiveDateField("end");
+                              }}
+                              className={`h-8 rounded-md text-xs ${
+                                cell.monthOffset !== 0 ? "opacity-40" : ""
+                              } ${
+                                draftDateFilter.type === "custom" &&
+                                (draftDateFilter.start === cell.iso || draftDateFilter.end === cell.iso)
+                                  ? "bg-[#5E56FF] text-white"
+                                  : "text-[#272835] hover:bg-[#F4F5F8]"
+                              }`}
+                            >
+                              {cell.day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-3 pt-3 border-t border-[#EDEFF4] flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (draftDateFilter.type === "custom") {
+                          const start = draftDateFilter.start;
+                          const end = draftDateFilter.end;
+                          if (!start || !end) return;
+                          const [s, e] = start <= end ? [start, end] : [end, start];
+                          setDateFilter({ type: "custom", start: s, end: e });
+                        } else {
+                          setDateFilter(draftDateFilter);
+                        }
+                        setFilterOpen(false);
+                      }}
+                      className="h-9 px-4 rounded-md bg-[#5E56FF] text-white text-sm font-medium hover:opacity-90"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -154,7 +404,13 @@ export function ExpenseOverview() {
 
         {/* Pending requests table */}
         <div className="reveal-card" style={{ animationDelay: `${(statCards.length + requestCards.length) * 120}ms` }}>
-          <PendingTable draftItems={drafts} onOpenDraft={handleOpenDraft} />
+          <PendingTable
+            draftItems={drafts}
+            onOpenDraft={handleOpenDraft}
+            rows={pendingRows}
+            dateFilter={dateFilter}
+            newlyAddedRowId={recentExpenseRowId}
+          />
         </div>
       </div>
       </div>
@@ -166,10 +422,21 @@ export function ExpenseOverview() {
           setNewExpenseOpen(false);
         }}
         onSaveDraft={handleSaveDraft}
+        onSubmitExpense={handleSubmitExpense}
+        onSubmitSuccessAcknowledge={() => {
+          setShowSubmittedToast(true);
+          setNewExpenseOpen(false);
+          setSelectedDraft(null);
+        }}
       />
       {showSavedToast && (
-        <div className="fixed bottom-6 right-6 z-[320] rounded-[12px] border border-[#DFE1E6] bg-white px-4 py-3 text-sm font-medium text-[#272835] shadow-[0_10px_24px_rgba(13,13,18,0.12)]">
+        <div className="app-toast fixed bottom-6 right-6 z-[320] rounded-[12px] border border-[#DFE1E6] bg-white px-4 py-3 text-sm font-medium text-[#272835] shadow-[0_10px_24px_rgba(13,13,18,0.12)]">
           Expense saved to drafts
+        </div>
+      )}
+      {showSubmittedToast && (
+        <div className="app-toast fixed bottom-6 right-6 z-[320] rounded-[12px] border border-[#DFE1E6] bg-white px-4 py-3 text-sm font-medium text-[#272835] shadow-[0_10px_24px_rgba(13,13,18,0.12)]">
+          Expense submitted successfully
         </div>
       )}
     </div>

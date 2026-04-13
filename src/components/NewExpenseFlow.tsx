@@ -5,6 +5,8 @@ interface NewExpenseFlowProps {
   open: boolean;
   onClose: () => void;
   onSaveDraft?: (draft: ExpenseDraftData) => void;
+  onSubmitExpense?: (expense: ExpenseDraftData) => void;
+  onSubmitSuccessAcknowledge?: () => void;
   initialDraft?: ExpenseDraftData | null;
 }
 
@@ -15,6 +17,7 @@ interface ExpenseDraft {
   type: string;
   dueDate: string;
   category: string;
+  items: DraftItem[];
   description: string;
   attachments: DraftAttachment[];
 }
@@ -31,9 +34,16 @@ export interface ExpenseDraftData {
   type: string;
   dueDate: string;
   category: string;
+  items: DraftItem[];
   description: string;
   attachments: DraftAttachment[];
   updatedAt: string;
+}
+
+export interface DraftItem {
+  name: string;
+  amount: string;
+  quantity: string;
 }
 
 const categories = [
@@ -85,6 +95,18 @@ function LaptopIcon() {
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="0.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10.25 8.25V4.25C10.25 3.07149 10.25 2.48224 9.88386 2.11612C9.51776 1.75 8.92851 1.75 7.75001 1.75H4.25C3.07149 1.75 2.48223 1.75 2.11611 2.11612C1.75 2.48224 1.75 3.07149 1.75 4.25V8.25" />
       <path d="M10.9921 10.25H1.0079C0.816426 10.25 0.691896 10.0544 0.777526 9.8882L1.75 8.25H10.25L11.2225 9.8882C11.3081 10.0544 11.1836 10.25 10.9921 10.25Z" />
+    </svg>
+  );
+}
+
+function TrashVuesaxIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+      <path d="M21 5.98C17.67 5.65 14.32 5.48 10.98 5.48C9 5.48 7.02 5.58 5.04 5.78L3 5.98" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.5 4.97L8.72 3.66C8.88 2.71 9 2 10.69 2H13.31C15 2 15.13 2.75 15.28 3.67L15.5 4.97" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18.85 9.14L18.2 19.21C18.09 20.78 18 22 15.21 22H8.79C6 22 5.91 20.78 5.8 19.21L5.15 9.14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10.33 16.5H13.66" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9.5 12.5H14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -142,21 +164,31 @@ function normalizeAmountValue(value: string): string {
   return integerPart;
 }
 
-export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: NewExpenseFlowProps) {
+export function NewExpenseFlow({
+  open,
+  onClose,
+  onSaveDraft,
+  onSubmitExpense,
+  onSubmitSuccessAcknowledge,
+  initialDraft,
+}: NewExpenseFlowProps) {
   const [step, setStep] = useState<Step>("new");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dueOpen, setDueOpen] = useState(false);
+  const [amountError, setAmountError] = useState(false);
   const [categoryError, setCategoryError] = useState(false);
   const categoryRef = useRef<HTMLDivElement | null>(null);
   const dueRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dragCounterRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [submitSuccessOpen, setSubmitSuccessOpen] = useState(false);
   const [draft, setDraft] = useState<ExpenseDraft>({
     amount: "",
     type: "Expense request",
     dueDate: "2026-04-20",
     category: "",
+    items: [{ name: "", amount: "", quantity: "1" }],
     description: "",
     attachments: [],
   });
@@ -175,7 +207,9 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
   useEffect(() => {
     if (!open) {
       setStep("new");
+      setAmountError(false);
       setCategoryError(false);
+      setSubmitSuccessOpen(false);
       return;
     }
 
@@ -185,6 +219,7 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
         type: initialDraft.type,
         dueDate: initialDraft.dueDate,
         category: initialDraft.category,
+        items: initialDraft.items?.length ? initialDraft.items : [{ name: "", amount: "", quantity: "1" }],
         description: initialDraft.description,
         attachments: initialDraft.attachments,
       });
@@ -315,6 +350,27 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
     }));
   }
 
+  function addItemRow() {
+    setDraft((prev) => ({
+      ...prev,
+      items: [...prev.items, { name: "", amount: "", quantity: "1" }],
+    }));
+  }
+
+  function updateItemRow(index: number, key: keyof DraftItem, value: string) {
+    setDraft((prev) => ({
+      ...prev,
+      items: prev.items.map((item, i) => (i === index ? { ...item, [key]: value } : item)),
+    }));
+  }
+
+  function removeItemRow(index: number) {
+    setDraft((prev) => ({
+      ...prev,
+      items: prev.items.length <= 1 ? prev.items : prev.items.filter((_, i) => i !== index),
+    }));
+  }
+
   function saveDraftAndClose() {
     onSaveDraft?.({
       id: initialDraft?.id ?? `draft-${Date.now()}`,
@@ -322,6 +378,7 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
       type: draft.type,
       dueDate: draft.dueDate,
       category: draft.category,
+      items: draft.items,
       description: draft.description,
       attachments: draft.attachments,
       updatedAt: new Date().toISOString(),
@@ -330,12 +387,40 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
   }
 
   function goToReview() {
+    const amountNumber = Number(draft.amount.replace(/,/g, ""));
+    if (!draft.amount || !Number.isFinite(amountNumber) || amountNumber <= 0) {
+      setAmountError(true);
+      return;
+    }
+    setAmountError(false);
+
     if (!draft.category) {
       setCategoryError(true);
       return;
     }
     setCategoryError(false);
     setStep("review");
+  }
+
+  function submitExpenseAndClose() {
+    onSubmitExpense?.({
+      id: initialDraft?.id ?? `expense-${Date.now()}`,
+      amount: draft.amount,
+      type: draft.type,
+      dueDate: draft.dueDate,
+      category: draft.category,
+      items: draft.items,
+      description: draft.description,
+      attachments: draft.attachments,
+      updatedAt: new Date().toISOString(),
+    });
+    setSubmitSuccessOpen(true);
+  }
+
+  function backToOverviewAfterSuccess() {
+    setSubmitSuccessOpen(false);
+    onSubmitSuccessAcknowledge?.();
+    onClose();
   }
 
   if (!open) return null;
@@ -387,7 +472,11 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
               </div>
 
               <Field label="Amount">
-                <div className="h-12 rounded-[12px] border border-[#DFE1E6] bg-white px-4 flex items-center gap-1 text-sm transition-[border-color,box-shadow] focus-within:border-[#6573F9] focus-within:ring-2 focus-within:ring-[#6573F9]/20">
+                <div
+                  className={`h-12 rounded-[12px] bg-white px-4 flex items-center gap-1 text-sm transition-[border-color,box-shadow] focus-within:border-[#6573F9] focus-within:ring-2 focus-within:ring-[#6573F9]/20 ${
+                    amountError ? "border border-[#DF1C41]" : "border border-[#DFE1E6]"
+                  }`}
+                >
                   <span className="text-[#272835]">$</span>
                   <input
                     value={draft.amount}
@@ -397,10 +486,14 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
                         amount: normalizeAmountValue(e.target.value),
                       }))
                     }
+                    onFocus={() => setAmountError(false)}
                     className="flex-1 bg-transparent outline-none text-[#272835]"
                     placeholder="0.00"
                   />
                 </div>
+                {amountError && (
+                  <p className="text-xs text-[#DF1C41]">Please enter an amount greater than 0.</p>
+                )}
               </Field>
 
               <div className="grid grid-cols-2 gap-[15px]">
@@ -441,8 +534,8 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
                           </button>
                         </div>
                         <div className="grid grid-cols-7 gap-1 text-[11px] text-[#808897] mb-1">
-                          {["S", "M", "T", "W", "T", "F", "S"].map((d) => (
-                            <div key={d} className="h-7 flex items-center justify-center">{d}</div>
+                          {["S", "M", "T", "W", "T", "F", "S"].map((d, idx) => (
+                            <div key={`${d}-${idx}`} className="h-7 flex items-center justify-center">{d}</div>
                           ))}
                         </div>
                         <div className="grid grid-cols-7 gap-1">
@@ -461,7 +554,7 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
                                   setVisibleMonth(new Date(cell.iso));
                                   setDueOpen(false);
                                 }}
-                                className={`h-8 rounded-md text-xs ${isSelected ? "bg-[#5E56FF] text-white" : "text-[#272835]"} ${isMuted ? "opacity-40" : ""} ${isPast ? "opacity-30 cursor-not-allowed" : "hover:bg-[#F4F5F8]"}`}
+                                className={`h-8 rounded-md text-xs ${isSelected ? "bg-[#5E56FF] text-white hover:bg-[#5E56FF]" : "text-[#272835]"} ${isMuted ? "opacity-40" : ""} ${isPast ? "opacity-30 cursor-not-allowed" : isSelected ? "" : "hover:bg-[#F4F5F8]"}`}
                               >
                                 {cell.day}
                               </button>
@@ -546,6 +639,74 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
                 {categoryError && (
                   <p className="text-xs text-[#DF1C41]">Please select a category to continue.</p>
                 )}
+              </Field>
+
+              <Field label="Items">
+                <div className="space-y-2">
+                  {draft.items.map((item, idx) => (
+                    <div key={`item-${idx}`} className="rounded-[12px] border border-[#DFE1E6] bg-white p-3 space-y-2">
+                      <input
+                        value={item.name}
+                        onChange={(e) => updateItemRow(idx, "name", e.target.value)}
+                        className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-3 text-sm text-[#272835] outline-none focus-visible:border-[#6573F9] focus-visible:ring-2 focus-visible:ring-[#6573F9]/20"
+                        placeholder="Item name"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-3 bg-white flex items-center gap-1 text-sm transition-[border-color,box-shadow] focus-within:border-[#6573F9] focus-within:ring-2 focus-within:ring-[#6573F9]/20">
+                          <span className="text-[#272835]">$</span>
+                          <input
+                            value={item.amount}
+                            onChange={(e) => updateItemRow(idx, "amount", normalizeAmountValue(e.target.value))}
+                            className="flex-1 bg-transparent text-sm text-[#272835] outline-none"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-2 bg-white flex items-center justify-between text-sm text-[#272835]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Math.max(1, Number(item.quantity) || 1);
+                              updateItemRow(idx, "quantity", String(Math.max(1, current - 1)));
+                            }}
+                            className="w-6 h-6 rounded-md text-[#808897] hover:bg-[#F4F5F8] hover:text-[#272835] inline-flex items-center justify-center"
+                            aria-label="Decrease quantity"
+                          >
+                            -
+                          </button>
+                          <span className="min-w-[20px] text-center font-medium">{Math.max(1, Number(item.quantity) || 1)}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Math.max(1, Number(item.quantity) || 1);
+                              updateItemRow(idx, "quantity", String(Math.min(999, current + 1)));
+                            }}
+                            className="w-6 h-6 rounded-md text-[#808897] hover:bg-[#F4F5F8] hover:text-[#272835] inline-flex items-center justify-center"
+                            aria-label="Increase quantity"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      {draft.items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeItemRow(idx)}
+                          className="inline-flex items-center gap-1 text-xs text-[#DF1C41] hover:opacity-80"
+                        >
+                          Remove item
+                          <TrashVuesaxIcon />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addItemRow}
+                  className="inline-flex items-center h-9 px-3 rounded-[10px] border border-[#DFE1E6] text-sm text-[#272835] bg-white hover:bg-[#F8F8F9]"
+                >
+                  + Add another item
+                </button>
               </Field>
 
               <Field label="Attachments">
@@ -635,6 +796,25 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
                 </div>
                 <div className="h-px bg-[#DFE1E6]" />
                 <div className="space-y-3">
+                  <p className="text-sm font-medium text-[#6C7386] tracking-[0.28px]">Items</p>
+                  <div className="space-y-2">
+                    {draft.items
+                      .filter((item) => item.name || item.amount)
+                      .map((item, idx) => (
+                        <div key={`review-item-${idx}`} className="flex items-center justify-between text-sm">
+                          <span className="text-[#272835]">{item.name || `Item ${idx + 1}`}</span>
+                          <span className="text-[#272835] font-medium">
+                            {(item.amount ? `$${item.amount}` : "$0.00")} x {item.quantity || "1"}
+                          </span>
+                        </div>
+                      ))}
+                    {draft.items.every((item) => !item.name && !item.amount) && (
+                      <p className="text-sm text-[#808897]">No items added</p>
+                    )}
+                  </div>
+                </div>
+                <div className="h-px bg-[#DFE1E6]" />
+                <div className="space-y-3">
                   <p className="text-sm font-medium text-[#6C7386] tracking-[0.28px]">Attachments</p>
                   <div className="flex gap-3">
                     {draft.attachments.map((file, idx) => (
@@ -680,7 +860,7 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
           ) : (
             <button
               type="button"
-              onClick={onClose}
+              onClick={submitExpenseAndClose}
               className="w-full h-10 rounded-[12px] border border-[#6573F9] text-white text-sm font-semibold"
               style={{
                 background:
@@ -693,6 +873,32 @@ export function NewExpenseFlow({ open, onClose, onSaveDraft, initialDraft }: New
           )}
         </div>
       </div>
+      {submitSuccessOpen && (
+        <div className="fixed inset-0 z-[360]">
+          <div className="success-drawer-backdrop absolute inset-0 bg-black/35" />
+          <div className="success-drawer-panel absolute top-0 bottom-0 right-0 w-full md:w-[440px] bg-white border-l border-[#DFE1E6] p-7 flex items-center">
+            <div className="w-full text-center">
+              <div className="success-checkmark mx-auto w-14 h-14 rounded-full bg-[#EAFBF0] text-[#0EAD5B] flex items-center justify-center text-[26px] font-semibold">
+                ✓
+              </div>
+              <h3 className="mt-5 text-[22px] leading-[1.3] font-semibold text-[#272835]">Expense logged successfully</h3>
+              <p className="mt-2 text-sm text-[#6C7386]">Your expense request has been submitted and is now pending approval.</p>
+              <button
+                type="button"
+                onClick={backToOverviewAfterSuccess}
+                className="mt-6 w-full h-10 rounded-[12px] border border-[#6573F9] text-white text-sm font-semibold"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.00) 100%), linear-gradient(90deg, #5E56FF 0%, #5E56FF 100%)",
+                  boxShadow: "1px 2px 4px rgba(13,13,18,0.12)",
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body,
   );

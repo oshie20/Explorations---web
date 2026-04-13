@@ -49,11 +49,22 @@ function AirplaneIcon() {
   );
 }
 
-type Category = "Travel" | "Utilities" | "Event" | "Software" | "Other";
-type EntryType = "Expense" | "Reimbursement";
+export type Category =
+  | "Travel"
+  | "Utilities"
+  | "Event"
+  | "Software"
+  | "Other"
+  | "Food & dining"
+  | "Transportation"
+  | "Accommodation"
+  | "Office supplies";
+export type EntryType = "Expense" | "Reimbursement";
 
-interface TableRow {
+export interface TableRow {
+  id: string;
   date: string;
+  dateIso?: string;
   requester: string;
   initials: string;
   color: string;
@@ -62,9 +73,42 @@ interface TableRow {
   category: Category;
 }
 
-const rows: TableRow[] = [
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDateMMDDYY(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  const mm = String(d.getMonth() + 1);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${mm}/${dd}/${yy}`;
+}
+
+function isoDaysAgo(daysAgo: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - daysAgo);
+  return toIsoDate(d);
+}
+
+const rowDates = {
+  d0: isoDaysAgo(0),
+  d3: isoDaysAgo(3),
+  d8: isoDaysAgo(8),
+  d15: isoDaysAgo(15),
+  d35: isoDaysAgo(35),
+  d95: isoDaysAgo(95),
+};
+
+export const seedRows: TableRow[] = [
   {
-    date: "1/01/26",
+    id: "seed-1",
+    date: formatDateMMDDYY(rowDates.d0),
+    dateIso: rowDates.d0,
     requester: "olivia.harris@designhub.com",
     initials: "OH",
     color: "#f97316",
@@ -73,7 +117,9 @@ const rows: TableRow[] = [
     category: "Travel",
   },
   {
-    date: "8/01/26",
+    id: "seed-2",
+    date: formatDateMMDDYY(rowDates.d3),
+    dateIso: rowDates.d3,
     requester: "ziar@designhub.com",
     initials: "ZI",
     color: "#8b5cf6",
@@ -82,7 +128,9 @@ const rows: TableRow[] = [
     category: "Utilities",
   },
   {
-    date: "4/01/26",
+    id: "seed-3",
+    date: formatDateMMDDYY(rowDates.d8),
+    dateIso: rowDates.d8,
     requester: "marcus.james@designhub.com",
     initials: "MJ",
     color: "#14b8a6",
@@ -91,7 +139,9 @@ const rows: TableRow[] = [
     category: "Event",
   },
   {
-    date: "8/01/26",
+    id: "seed-4",
+    date: formatDateMMDDYY(rowDates.d15),
+    dateIso: rowDates.d15,
     requester: "sophia.kim@designhub.com",
     initials: "SK",
     color: "#ec4899",
@@ -100,7 +150,9 @@ const rows: TableRow[] = [
     category: "Software",
   },
   {
-    date: "11/01/26",
+    id: "seed-5",
+    date: formatDateMMDDYY(rowDates.d35),
+    dateIso: rowDates.d35,
     requester: "liam.watson@designhub.com",
     initials: "LW",
     color: "#6573f9",
@@ -109,7 +161,9 @@ const rows: TableRow[] = [
     category: "Other",
   },
   {
-    date: "7/01/26",
+    id: "seed-6",
+    date: formatDateMMDDYY(rowDates.d95),
+    dateIso: rowDates.d95,
     requester: "ava.smith@designhub.com",
     initials: "AS",
     color: "#22c55e",
@@ -121,8 +175,12 @@ const rows: TableRow[] = [
 
 const categoryIcon: Record<Category, React.ReactNode> = {
   Travel: <AirplaneIcon />,
+  "Food & dining": <DashboardSquareIcon />,
+  Transportation: <AirplaneIcon />,
+  Accommodation: <LaptopIcon />,
   Utilities: <InvoiceIcon />,
   Event: <DashboardSquareIcon />,
+  "Office supplies": <InvoiceIcon />,
   Software: <LaptopIcon />,
   Other: <DashboardSquareIcon />,
 };
@@ -151,7 +209,7 @@ function getNotesAndAttachments(row: TableRow): { notesText: string; attachments
   const handle = row.requester.split("@")[0]?.replace(/\./g, "_") ?? "requester";
 
   const byCategory: Record<
-    Category,
+    "Travel" | "Utilities" | "Event" | "Software" | "Other",
     { expense: { notes: string; files: string[] }; reimbursement: { notes: string; files: string[] } }
   > = {
     Travel: {
@@ -240,16 +298,33 @@ function getNotesAndAttachments(row: TableRow): { notesText: string; attachments
   };
 
   const bucket = row.type === "Expense" ? "expense" : "reimbursement";
-  const { notes, files } = byCategory[row.category][bucket];
+  const fallbackCategory: keyof typeof byCategory =
+    row.category in byCategory ? (row.category as keyof typeof byCategory) : "Other";
+  const { notes, files } = byCategory[fallbackCategory][bucket];
   return { notesText: notes, attachments: files };
 }
 
 interface PendingTableProps {
   draftItems?: ExpenseDraftData[];
   onOpenDraft?: (draft: ExpenseDraftData) => void;
+  rows?: TableRow[];
+  newlyAddedRowId?: string | null;
+  dateFilter?: DateFilter;
 }
 
-export function PendingTable({ draftItems = [], onOpenDraft }: PendingTableProps) {
+export type DateFilter =
+  | { type: "today" }
+  | { type: "30d" }
+  | { type: "90d" }
+  | { type: "custom"; start: string; end: string };
+
+export function PendingTable({
+  draftItems = [],
+  onOpenDraft,
+  rows = seedRows,
+  newlyAddedRowId = null,
+  dateFilter = { type: "90d" },
+}: PendingTableProps) {
   const [activeTab, setActiveTab] = useState("Pending requests");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [drawerMounted, setDrawerMounted] = useState(false);
@@ -395,6 +470,29 @@ export function PendingTable({ draftItems = [], onOpenDraft }: PendingTableProps
 
   const approveLabel = selectedRow?.type === "Expense" ? "Approve Expense" : "Approve Reimbursement";
   const rejectLabel = selectedRow?.type === "Expense" ? "Reject expense" : "Reject reimbursement";
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const filteredRows = rows.filter((row) => {
+    const rowDate = row.dateIso ? new Date(`${row.dateIso}T00:00:00`) : null;
+    if (!rowDate || Number.isNaN(rowDate.getTime())) return true;
+
+    if (dateFilter.type === "today") {
+      return rowDate.getTime() >= startOfToday.getTime() && rowDate.getTime() < startOfToday.getTime() + 86400000;
+    }
+
+    if (dateFilter.type === "30d" || dateFilter.type === "90d") {
+      const days = dateFilter.type === "30d" ? 30 : 90;
+      const cutoff = new Date(startOfToday);
+      cutoff.setDate(cutoff.getDate() - (days - 1));
+      return rowDate >= cutoff && rowDate <= new Date(startOfToday.getTime() + 86400000 - 1);
+    }
+
+    const start = dateFilter.start ? new Date(`${dateFilter.start}T00:00:00`) : null;
+    const end = dateFilter.end ? new Date(`${dateFilter.end}T23:59:59`) : null;
+    if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return true;
+    return rowDate >= start && rowDate <= end;
+  });
 
   return (
     <div className="bg-white overflow-hidden" style={{ borderRadius: "16px", boxShadow: "0 2px 2px rgba(0,0,0,0.02)" }}>
@@ -452,10 +550,19 @@ export function PendingTable({ draftItems = [], onOpenDraft }: PendingTableProps
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
+            {filteredRows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-sm text-[#808897]">
+                  No expenses found for this date range.
+                </td>
+              </tr>
+            )}
+            {filteredRows.map((row) => (
               <tr
-                key={i}
-                className="border-b border-[#EDEFF4] last:border-0 hover:bg-[#fafafa] transition-colors cursor-pointer"
+                key={row.id}
+                className={`border-b border-[#EDEFF4] last:border-0 hover:bg-[#fafafa] transition-colors cursor-pointer ${
+                  row.id === newlyAddedRowId ? "new-expense-row" : ""
+                }`}
                 onClick={() => openDetails(row)}
               >
                 <td className="px-3 sm:px-4 py-3 sm:py-4 text-[#272835] text-xs sm:text-sm">{row.date}</td>
@@ -571,7 +678,7 @@ export function PendingTable({ draftItems = [], onOpenDraft }: PendingTableProps
         <div className="fixed inset-0 z-[200] isolate">
           <div
             className={
-              "fixed inset-0 z-0 bg-black/40 transition-opacity duration-[430ms] ease-[cubic-bezier(0.22,1,0.36,1)] " +
+              "fixed inset-0 z-0 bg-black/40 transition-opacity duration-[280ms] ease-[cubic-bezier(0.23,1,0.32,1)] " +
               (detailsOpen ? "opacity-100" : "opacity-0 pointer-events-none")
             }
             onClick={closeDetails}
@@ -580,7 +687,7 @@ export function PendingTable({ draftItems = [], onOpenDraft }: PendingTableProps
           <div
             className={
               "fixed top-0 bottom-0 right-0 z-10 flex h-full max-h-[100dvh] w-full flex-col overflow-hidden bg-white border-l border-[#EDEFF4] md:w-[520px] md:rounded-none " +
-              "transform transition-all duration-[430ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform " +
+              "transform transition-[transform,opacity] duration-[360ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform " +
               (detailsOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0")
             }
             role="dialog"
