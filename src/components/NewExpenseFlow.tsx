@@ -164,6 +164,11 @@ function normalizeAmountValue(value: string): string {
   return integerPart;
 }
 
+function parseAmountValue(value: string): number {
+  const n = Number(value.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
 export function NewExpenseFlow({
   open,
   onClose,
@@ -175,7 +180,6 @@ export function NewExpenseFlow({
   const [step, setStep] = useState<Step>("new");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dueOpen, setDueOpen] = useState(false);
-  const [amountError, setAmountError] = useState(false);
   const [categoryError, setCategoryError] = useState(false);
   const categoryRef = useRef<HTMLDivElement | null>(null);
   const dueRef = useRef<HTMLDivElement | null>(null);
@@ -207,7 +211,6 @@ export function NewExpenseFlow({
   useEffect(() => {
     if (!open) {
       setStep("new");
-      setAmountError(false);
       setCategoryError(false);
       setSubmitSuccessOpen(false);
       return;
@@ -237,11 +240,29 @@ export function NewExpenseFlow({
     return () => window.removeEventListener("mousedown", onPointerDown);
   }, [categoryOpen, dueOpen]);
 
-  const formattedAmount = useMemo(() => {
-    const n = Number(draft.amount.replace(/,/g, ""));
-    const safe = Number.isFinite(n) ? n : 0;
-    return safe.toLocaleString(undefined, { style: "currency", currency: "USD" });
-  }, [draft.amount]);
+  const totalAmountNumber = useMemo(
+    () =>
+      draft.items.reduce((sum, item) => {
+        const amount = parseAmountValue(item.amount);
+        const quantity = Math.max(1, Number(item.quantity) || 1);
+        return sum + amount * quantity;
+      }, 0),
+    [draft.items],
+  );
+
+  const totalAmountValue = useMemo(
+    () =>
+      totalAmountNumber.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [totalAmountNumber],
+  );
+
+  const formattedAmount = useMemo(
+    () => totalAmountNumber.toLocaleString(undefined, { style: "currency", currency: "USD" }),
+    [totalAmountNumber],
+  );
 
   const dueDateText = useMemo(() => {
     const d = new Date(`${draft.dueDate}T00:00:00`);
@@ -374,7 +395,7 @@ export function NewExpenseFlow({
   function saveDraftAndClose() {
     onSaveDraft?.({
       id: initialDraft?.id ?? `draft-${Date.now()}`,
-      amount: draft.amount,
+      amount: totalAmountValue,
       type: draft.type,
       dueDate: draft.dueDate,
       category: draft.category,
@@ -387,13 +408,6 @@ export function NewExpenseFlow({
   }
 
   function goToReview() {
-    const amountNumber = Number(draft.amount.replace(/,/g, ""));
-    if (!draft.amount || !Number.isFinite(amountNumber) || amountNumber <= 0) {
-      setAmountError(true);
-      return;
-    }
-    setAmountError(false);
-
     if (!draft.category) {
       setCategoryError(true);
       return;
@@ -405,7 +419,7 @@ export function NewExpenseFlow({
   function submitExpenseAndClose() {
     onSubmitExpense?.({
       id: initialDraft?.id ?? `expense-${Date.now()}`,
-      amount: draft.amount,
+      amount: totalAmountValue,
       type: draft.type,
       dueDate: draft.dueDate,
       category: draft.category,
@@ -470,31 +484,6 @@ export function NewExpenseFlow({
                 <h2 className="text-[20px] leading-[1.35] font-semibold text-[#272835]">Create new expense</h2>
                 <p className="text-sm text-[#6C7386] tracking-[0.28px] mt-1">Create a new expense or reimbursement to be approved</p>
               </div>
-
-              <Field label="Amount">
-                <div
-                  className={`h-12 rounded-[12px] bg-white px-4 flex items-center gap-1 text-sm transition-[border-color,box-shadow] focus-within:border-[#6573F9] focus-within:ring-2 focus-within:ring-[#6573F9]/20 ${
-                    amountError ? "border border-[#DF1C41]" : "border border-[#DFE1E6]"
-                  }`}
-                >
-                  <span className="text-[#272835]">$</span>
-                  <input
-                    value={draft.amount}
-                    onChange={(e) =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        amount: normalizeAmountValue(e.target.value),
-                      }))
-                    }
-                    onFocus={() => setAmountError(false)}
-                    className="flex-1 bg-transparent outline-none text-[#272835]"
-                    placeholder="0.00"
-                  />
-                </div>
-                {amountError && (
-                  <p className="text-xs text-[#DF1C41]">Please enter an amount greater than 0.</p>
-                )}
-              </Field>
 
               <div className="grid grid-cols-2 gap-[15px]">
                 <Field label="Type">
@@ -623,6 +612,7 @@ export function NewExpenseFlow({
                         onClick={() => {
                           setDraft((prev) => ({ ...prev, category: suggested }));
                           setCategoryError(false);
+                          setCategoryOpen(false);
                         }}
                         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs border ${
                           draft.category === suggested
@@ -644,7 +634,7 @@ export function NewExpenseFlow({
               <Field label="Items">
                 <div className="space-y-2">
                   {draft.items.map((item, idx) => (
-                    <div key={`item-${idx}`} className="rounded-[12px] border border-[#DFE1E6] bg-white p-3 space-y-2">
+                    <div key={`item-${idx}`} className="rounded-[12px] border border-[#DFE1E6] bg-white p-4 space-y-2">
                       <input
                         value={item.name}
                         onChange={(e) => updateItemRow(idx, "name", e.target.value)}
@@ -700,13 +690,19 @@ export function NewExpenseFlow({
                     </div>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={addItemRow}
-                  className="inline-flex items-center h-9 px-3 rounded-[10px] border border-[#DFE1E6] text-sm text-[#272835] bg-white hover:bg-[#F8F8F9]"
-                >
-                  + Add another item
-                </button>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={addItemRow}
+                    className="inline-flex items-center h-9 px-3 rounded-[10px] border border-[#DFE1E6] text-sm text-[#272835] bg-white hover:bg-[#F8F8F9]"
+                  >
+                    + Add another item
+                  </button>
+                  <div className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#EFF0FC] border border-[#E8E8FC] px-3 pt-[9px] pb-2">
+                    <span className="text-xs font-medium leading-3 align-middle text-[#6C7386] tracking-[0.24px]">Total</span>
+                    <span className="text-xs font-semibold leading-3 align-middle text-[#272835]">${totalAmountValue}</span>
+                  </div>
+                </div>
               </Field>
 
               <Field label="Attachments">
