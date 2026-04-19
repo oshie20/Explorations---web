@@ -32,8 +32,37 @@ import { StatCard, StatCardIcons } from "@/components/StatCard";
 import { RequestCard } from "@/components/RequestCard";
 import { PendingTable, type DateFilter, type TableRow } from "@/components/PendingTable";
 import { CURRENT_USER_EMAIL } from "@/lib/currentUser";
+import { DEMO_DRAFTS, DEMO_SUBMITTED_ROWS } from "@/lib/expenseDemoSeed";
 import { NewExpenseFlow } from "../components/NewExpenseFlow";
 import type { ExpenseDraftData } from "../components/NewExpenseFlow";
+
+/**
+ * Loads drafts + submitted rows from localStorage.
+ * If both lists are empty (missing keys or `[]`), show demo data — otherwise earlier
+ * versions only seeded when keys were absent, so `[]` in storage hid the demo forever.
+ */
+function loadExpenseStateFromStorage(): { drafts: ExpenseDraftData[]; submitted: TableRow[] } {
+  try {
+    const rawD = window.localStorage.getItem("expense-drafts");
+    const rawS = window.localStorage.getItem("submitted-expenses");
+    const draftsParsed = rawD != null ? (JSON.parse(rawD) as unknown) : null;
+    const submittedParsed = rawS != null ? (JSON.parse(rawS) as unknown) : null;
+    const draftsArr = Array.isArray(draftsParsed) ? (draftsParsed as ExpenseDraftData[]) : null;
+    const submittedArr = Array.isArray(submittedParsed) ? (submittedParsed as TableRow[]) : null;
+    const draftsEmpty = !draftsArr || draftsArr.length === 0;
+    const submittedEmpty = !submittedArr || submittedArr.length === 0;
+
+    if (draftsEmpty && submittedEmpty) {
+      return { drafts: DEMO_DRAFTS, submitted: DEMO_SUBMITTED_ROWS };
+    }
+    return {
+      drafts: draftsArr ?? [],
+      submitted: submittedArr ?? [],
+    };
+  } catch {
+    return { drafts: DEMO_DRAFTS, submitted: DEMO_SUBMITTED_ROWS };
+  }
+}
 
 function toISODate(date: Date): string {
   const y = date.getFullYear();
@@ -68,36 +97,14 @@ export function ExpenseOverview() {
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement | null>(null);
-  const [drafts, setDrafts] = useState<ExpenseDraftData[]>([]);
-  const [submittedExpenses, setSubmittedExpenses] = useState<TableRow[]>([]);
+  const [drafts, setDrafts] = useState<ExpenseDraftData[]>(() => loadExpenseStateFromStorage().drafts);
+  const [submittedExpenses, setSubmittedExpenses] = useState<TableRow[]>(() => loadExpenseStateFromStorage().submitted);
   const [recentExpenseRowId, setRecentExpenseRowId] = useState<string | null>(null);
   const [selectedDraft, setSelectedDraft] = useState<ExpenseDraftData | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: "90d" });
   const [draftDateFilter, setDraftDateFilter] = useState<DateFilter>({ type: "90d" });
   const [customMonth, setCustomMonth] = useState(() => new Date());
   const [activeDateField, setActiveDateField] = useState<"start" | "end">("start");
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("expense-drafts");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as ExpenseDraftData[];
-      if (Array.isArray(parsed)) setDrafts(parsed);
-    } catch {
-      // Ignore malformed persisted draft payloads.
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("submitted-expenses");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as TableRow[];
-      if (Array.isArray(parsed)) setSubmittedExpenses(parsed);
-    } catch {
-      // Ignore malformed persisted submitted payloads.
-    }
-  }, []);
 
   useEffect(() => {
     window.localStorage.setItem("expense-drafts", JSON.stringify(drafts));
@@ -133,9 +140,7 @@ export function ExpenseOverview() {
     });
     setSelectedDraft(null);
     setNewExpenseOpen(false);
-    toast("Expense saved to drafts", {
-      description: "Resume anytime from Pending requests.",
-    });
+    toast("Expense saved to drafts");
   }
 
   function handleOpenDraft(draft: ExpenseDraftData) {
@@ -418,16 +423,7 @@ export function ExpenseOverview() {
         onSubmitSuccessAcknowledge={() => {
           setNewExpenseOpen(false);
           setSelectedDraft(null);
-          toast("Expense submitted successfully", {
-            description: new Date().toLocaleString(undefined, {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-            }),
-          });
+          toast("Expense submitted successfully");
         }}
       />
     </div>
