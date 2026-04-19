@@ -8,6 +8,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // If edits don’t trigger reloads (iCloud/Dropbox, some network volumes, aggressive AV),
+    // run: VITE_WATCH_POLLING=1 npm run dev
+    watch:
+      process.env.VITE_WATCH_POLLING === "1"
+        ? { usePolling: true, interval: 100 }
+        : undefined,
     fs: {
       // Allow serving the locally stored avatar file via "/@fs/..."
       allow: [

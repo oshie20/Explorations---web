@@ -1,5 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import "./vaul-drawer.css";
+import "sonner/dist/styles.css";
 import './index.css'
 import App from './App.tsx'
 

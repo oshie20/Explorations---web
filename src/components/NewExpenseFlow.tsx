@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { getAttachmentIconSrc } from "@/lib/attachmentIcon";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface NewExpenseFlowProps {
   open: boolean;
@@ -138,13 +148,6 @@ function detectAttachmentKind(name: string): AttachmentKind {
   return "file";
 }
 
-function attachmentBadge(kind: AttachmentKind): string {
-  if (kind === "pdf") return "PDF";
-  if (kind === "csv") return "CSV";
-  if (kind === "image") return "IMG";
-  return "FILE";
-}
-
 function normalizeAmountValue(value: string): string {
   const noCommas = value.replace(/,/g, "");
   const cleaned = noCommas.replace(/[^0-9.]/g, "");
@@ -184,6 +187,8 @@ export function NewExpenseFlow({
   const categoryRef = useRef<HTMLDivElement | null>(null);
   const dueRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const reuploadInputRef = useRef<HTMLInputElement | null>(null);
+  const reuploadIndexRef = useRef<number | null>(null);
   const dragCounterRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [submitSuccessOpen, setSubmitSuccessOpen] = useState(false);
@@ -371,6 +376,23 @@ export function NewExpenseFlow({
     }));
   }
 
+  function beginReuploadAt(index: number) {
+    reuploadIndexRef.current = index;
+    reuploadInputRef.current?.click();
+  }
+
+  function handleReuploadFile(fileList: FileList | null) {
+    const index = reuploadIndexRef.current;
+    reuploadIndexRef.current = null;
+    if (index === null || !fileList?.length) return;
+    const file = fileList[0];
+    const item = { name: file.name, kind: detectAttachmentKind(file.name) };
+    setDraft((prev) => ({
+      ...prev,
+      attachments: prev.attachments.map((att, i) => (i === index ? item : att)),
+    }));
+  }
+
   function addItemRow() {
     setDraft((prev) => ({
       ...prev,
@@ -440,6 +462,7 @@ export function NewExpenseFlow({
   if (!open) return null;
 
   return createPortal(
+    <>
     <div className="fixed inset-0 z-[300] bg-[#F9FBFC] flex flex-col">
       <div className="h-20 shrink-0 border-b border-[#EEEFF2] bg-white px-6 sm:px-10 lg:px-20 flex items-center justify-between">
         <img src="/logo.svg" alt="Stratus" className="h-8 w-auto" />
@@ -455,7 +478,7 @@ export function NewExpenseFlow({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="w-[400px] mx-auto pt-14 pb-28">
-          <div className="flex items-center justify-between mb-[15px]">
+          <div className="flex items-center justify-between mb-4">
             <button
               type="button"
               onClick={step === "new" ? onClose : () => setStep("new")}
@@ -479,13 +502,13 @@ export function NewExpenseFlow({
           </div>
 
           {step === "new" ? (
-            <div className="space-y-[15px]">
+            <div className="flex flex-col gap-4">
               <div>
                 <h2 className="text-[20px] leading-[1.35] font-semibold text-[#272835]">Create new expense</h2>
                 <p className="text-sm text-[#6C7386] tracking-[0.28px] mt-1">Create a new expense or reimbursement to be approved</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-[15px]">
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Type">
                   <div className="relative">
                     <select
@@ -699,68 +722,107 @@ export function NewExpenseFlow({
                     + Add another item
                   </button>
                   <div className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#EFF0FC] border border-[#E8E8FC] px-3 pt-[9px] pb-2">
-                    <span className="text-xs font-medium leading-3 align-middle text-[#6C7386] tracking-[0.24px]">Total</span>
+                    <span className="text-xs font-medium leading-3 align-middle text-[rgba(39,40,53,1)] tracking-[0.24px]">Total:</span>
                     <span className="text-xs font-semibold leading-3 align-middle text-[#272835]">${totalAmountValue}</span>
                   </div>
                 </div>
               </Field>
 
               <Field label="Attachments">
-                <div
-                  className={`rounded-[12px] border border-dashed bg-white px-3 py-[14px] transition-colors ${
-                    isDraggingFiles ? "border-[#6573F9] bg-[#F6F7FF]" : "border-[#DFE1E6]"
-                  }`}
-                  onDragEnter={onDragEnter}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
-                  onDrop={onDropFiles}
-                >
-                  <div className="flex items-start gap-5">
-                    <img src="/file-attachment-02.svg" alt="" width="24" height="24" className="shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-[#272835]">
-                        Drag and drop here or{" "}
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[#5E56FF] underline">
-                          click
-                        </button>{" "}
-                        to upload
-                      </p>
-                      <p className="text-xs text-[#6C7386] tracking-[0.24px] mt-1">You may upload PDF, PNG, or JPEG files</p>
-                    </div>
-                  </div>
-                </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.csv,.gif,.webp,.svg"
+                  accept=".pdf,.png,.jpg,.jpeg,.csv,.gif,.webp,.svg,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.mp3,.mp4,.mov,.wav,.html,.htm"
                   multiple
                   className="hidden"
                   onChange={(e) => handleFiles(e.target.files)}
                 />
-                {draft.attachments.length > 0 && (
+                <input
+                  ref={reuploadInputRef}
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.csv,.gif,.webp,.svg,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.mp3,.mp4,.mov,.wav,.html,.htm"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleReuploadFile(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                {draft.attachments.length === 0 ? (
+                  <div
+                    className={`rounded-[12px] border border-dashed bg-white px-3 py-[14px] transition-colors ${
+                      isDraggingFiles ? "border-[#6573F9] bg-[#F6F7FF]" : "border-[#DFE1E6]"
+                    }`}
+                    onDragEnter={onDragEnter}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDropFiles}
+                  >
+                    <div className="flex items-start gap-5">
+                      <img src="/file-attachment-02.svg" alt="" width="24" height="24" className="shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-[#272835]">
+                          Drag and drop here or{" "}
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[#5E56FF] underline">
+                            click
+                          </button>{" "}
+                          to upload
+                        </p>
+                        <p className="text-xs text-[#6C7386] tracking-[0.24px] mt-1">
+                        Documents, images, spreadsheets, archives, audio, and video files
+                      </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                   <div className="space-y-2">
                     {draft.attachments.map((file, idx) => (
                       <div key={`${file.name}-${idx}`} className="h-[44px] rounded-[12px] border border-[#DFE1E6] bg-white px-3 flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center h-5 min-w-[28px] rounded bg-[#EEF0F8] text-[10px] font-semibold text-[#5E56FF] px-1">
-                          {attachmentBadge(file.kind)}
-                        </span>
-                        <span className="text-sm text-[#272835] truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(idx)}
-                          className="ml-auto text-xs text-[#808897] hover:text-[#272835]"
-                          aria-label={`Remove ${file.name}`}
+                        <img
+                          src={getAttachmentIconSrc(file.name)}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="shrink-0 object-contain"
+                        />
+                        <span
+                          className="min-w-0 flex-1 truncate text-sm text-[#272835]"
+                          title={file.name}
                         >
-                          Remove
-                        </button>
+                          {file.name}
+                        </span>
+                        <div className="ml-auto flex shrink-0 items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => beginReuploadAt(idx)}
+                            className="inline-flex items-center justify-center rounded-lg border border-[#E0E1E6] p-2 text-[#5E56FF] hover:bg-[#F6F7FF]"
+                            aria-label={`Replace ${file.name}`}
+                          >
+                            <img src="/rotate-left.svg" alt="" width={14} height={14} className="shrink-0" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(idx)}
+                            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-[#E0E1E6] p-2 text-[#DF1C41] hover:bg-[#FEF2F3] hover:opacity-90"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <TrashVuesaxIcon />
+                          </button>
+                        </div>
                       </div>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center h-9 px-3 rounded-[10px] border border-[#DFE1E6] text-sm text-[#272835] bg-white hover:bg-[#F8F8F9]"
+                    >
+                      + Add another file
+                    </button>
                   </div>
                 )}
               </Field>
             </div>
           ) : (
-            <div className="space-y-[15px]">
+            <div className="flex flex-col gap-4">
               <div>
                 <h2 className="text-[20px] leading-[1.35] font-semibold text-[#272835]">Review expense</h2>
                 <p className="text-sm font-medium text-[#6C7386] tracking-[0.28px] mt-1">Double-check the details before submitting</p>
@@ -788,7 +850,7 @@ export function NewExpenseFlow({
                   />
                   <Row label="Type" value={<span className="text-[#272835] font-medium">{draft.type}</span>} />
                   <Row label="Due date" value={<span className="text-[#272835] font-medium">{dueDateText}</span>} />
-                  <Row label="Description" value={<span className="text-[#272835] font-medium text-left max-w-[180px]">{draft.description}</span>} />
+                  <Row label="Description" value={<span className="text-[#272835] font-medium text-right max-w-[180px]">{draft.description}</span>} />
                 </div>
                 <div className="h-px bg-[#DFE1E6]" />
                 <div className="space-y-3">
@@ -814,11 +876,18 @@ export function NewExpenseFlow({
                   <p className="text-sm font-medium text-[#6C7386] tracking-[0.28px]">Attachments</p>
                   <div className="flex gap-3">
                     {draft.attachments.map((file, idx) => (
-                      <span key={`${file.name}-${idx}`} className="inline-flex items-center gap-1.5 rounded-[40px] bg-[#F8F8F9] px-[10px] py-[10px] text-xs font-medium text-[#272835]">
-                        <span className="inline-flex items-center justify-center h-4 min-w-[22px] rounded bg-[#EEF0F8] text-[9px] font-semibold text-[#5E56FF] px-1">
-                          {attachmentBadge(file.kind)}
-                        </span>
-                        {file.name}
+                      <span
+                        key={`${file.name}-${idx}`}
+                        className="inline-flex items-center gap-2 rounded-[40px] bg-[#F8F8F9] px-[10px] py-[10px] text-xs font-medium text-[#272835] max-w-full"
+                      >
+                        <img
+                          src={getAttachmentIconSrc(file.name)}
+                          alt=""
+                          width={20}
+                          height={20}
+                          className="shrink-0 object-contain"
+                        />
+                        <span className="truncate">{file.name}</span>
                       </span>
                     ))}
                   </div>
@@ -869,40 +938,41 @@ export function NewExpenseFlow({
           )}
         </div>
       </div>
-      {submitSuccessOpen && (
-        <div className="fixed inset-0 z-[360]">
-          <div className="success-drawer-backdrop absolute inset-0 bg-black/35" />
-          <div className="success-drawer-panel absolute top-0 bottom-0 right-0 w-full md:w-[440px] bg-white border-l border-[#DFE1E6] p-7 flex items-center">
-            <div className="w-full text-center">
-              <div className="success-checkmark mx-auto w-14 h-14 rounded-full bg-[#EAFBF0] text-[#0EAD5B] flex items-center justify-center text-[26px] font-semibold">
-                ✓
-              </div>
-              <h3 className="mt-5 text-[22px] leading-[1.3] font-semibold text-[#272835]">Expense logged successfully</h3>
-              <p className="mt-2 text-sm text-[#6C7386]">Your expense request has been submitted and is now pending approval.</p>
-              <button
-                type="button"
-                onClick={backToOverviewAfterSuccess}
-                className="mt-6 w-full h-10 rounded-[12px] border border-[#6573F9] text-white text-sm font-semibold"
-                style={{
-                  background:
-                    "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.00) 100%), linear-gradient(90deg, #5E56FF 0%, #5E56FF 100%)",
-                  boxShadow: "1px 2px 4px rgba(13,13,18,0.12)",
-                }}
-              >
-                Done
-              </button>
-            </div>
+    </div>
+
+    <Dialog
+      open={submitSuccessOpen}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) backToOverviewAfterSuccess();
+      }}
+    >
+      <DialogContent className="inset-0 left-0 top-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col justify-center rounded-none border-0 bg-white p-8 shadow-none sm:max-w-none gap-6 overflow-y-auto">
+        <DialogHeader className="items-center text-center sm:text-center space-y-0">
+          <div className="success-checkmark mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EAFBF0] text-[26px] font-semibold text-[#0EAD5B]">
+            ✓
           </div>
-        </div>
-      )}
-    </div>,
+          <DialogTitle className="mt-5 text-[22px] leading-[1.3] font-semibold text-[#272835]">
+            Expense logged successfully
+          </DialogTitle>
+          <DialogDescription className="mt-2 text-sm text-[#6C7386]">
+            Your expense request has been submitted and is now pending approval.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="w-full max-w-[400px] flex-col gap-0 sm:flex-col mx-auto sm:justify-center">
+          <Button type="button" className="w-full" onClick={backToOverviewAfterSuccess}>
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>,
     document.body,
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-2">
+    <label className="mb-0 block space-y-2">
       <span className="text-sm font-medium text-[#6C7386] tracking-[0.28px]">{label}</span>
       {children}
     </label>

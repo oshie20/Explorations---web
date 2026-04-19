@@ -73,32 +73,34 @@ const navItems = [
 ] as const;
 
 interface SidebarProps {
-  open?: boolean;
+  /** When true, sidebar is rendered inside the mobile Vaul drawer (not the desktop rail). */
+  embedded?: boolean;
   onClose?: () => void;
 }
 
-export function Sidebar({ open = false, onClose }: SidebarProps) {
+export function Sidebar({ embedded = false, onClose }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed lg:relative inset-y-0 left-0 z-50 min-h-screen bg-[#F9FBFC] flex flex-col shrink-0 transition-transform duration-300 ease-in-out",
-        "w-[224px] lg:translate-x-0",
-        open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        "flex flex-col bg-[#F9FBFC]",
+        embedded ? "h-full min-h-0 w-full" : "min-h-0 h-full w-[224px] shrink-0",
       )}
     >
-      <div className="h-16 lg:h-20 flex items-center justify-between px-4 lg:px-8">
+      <div className="h-16 lg:h-20 flex items-center justify-between px-4 lg:px-8 shrink-0">
         <img src="/logo.svg" alt="Stratus" className="h-8 lg:h-[32px] w-auto" />
-        <button
-          type="button"
-          onClick={onClose}
-          className="lg:hidden w-10 h-10 flex items-center justify-center rounded-lg text-[#808897] hover:bg-[#f4f5f8] -mr-1"
-          aria-label="Close menu"
-        >
-          <img src="/x-close.svg" alt="" width="16" height="16" />
-        </button>
+        {embedded && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-lg text-[#808897] hover:bg-[#f4f5f8] -mr-1"
+            aria-label="Close menu"
+          >
+            <img src="/x-close.svg" alt="" width="16" height="16" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 px-4 lg:px-5 py-4 lg:py-5 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-4 lg:px-5 py-4 lg:py-5 space-y-0.5 overflow-y-auto min-h-0">
         {navItems.map((item) => (
           <button
             key={item.label}
@@ -107,8 +109,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             className={cn(
               "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors group",
               item.active
-                ? "bg-white text-[#272835] font-medium border-[0.5px] border-[#EDEEEF] shadow-[0_2px_2px_rgba(0,0,0,0.02)]"
-                : "text-[#808897] hover:bg-[#f4f5f8] hover:text-[#272835]"
+                ? "bg-white text-[#272835] font-medium border border-[#E6E6E6] shadow-[0_0_12px_rgba(0,0,0,0.03),0_2px_2px_rgba(0,0,0,0.02)]"
+                : "text-[#808897] hover:bg-[#f4f5f8] hover:text-[#272835]",
             )}
           >
             <div className="flex items-center gap-2.5">

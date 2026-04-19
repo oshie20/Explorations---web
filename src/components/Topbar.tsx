@@ -1,4 +1,5 @@
 import { SearchNormal1 } from "iconsax-react";
+import { CURRENT_USER_AVATAR_SRC } from "@/lib/currentUser";
 
 function NotificationIcon() {
   return (
@@ -101,7 +102,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
         {/* Avatar */}
         <img
-          src="/avatar.svg"
+          src={CURRENT_USER_AVATAR_SRC}
           alt="User"
           className="w-10 h-10 rounded-full object-cover shrink-0"
         />

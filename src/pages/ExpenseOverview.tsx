@@ -27,9 +27,11 @@ function FilterLinesIcon() {
 }
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { StatCard, StatCardIcons } from "@/components/StatCard";
 import { RequestCard } from "@/components/RequestCard";
-import { PendingTable, seedRows, type DateFilter, type TableRow } from "@/components/PendingTable";
+import { PendingTable, type DateFilter, type TableRow } from "@/components/PendingTable";
+import { CURRENT_USER_EMAIL } from "@/lib/currentUser";
 import { NewExpenseFlow } from "../components/NewExpenseFlow";
 import type { ExpenseDraftData } from "../components/NewExpenseFlow";
 
@@ -70,8 +72,6 @@ export function ExpenseOverview() {
   const [submittedExpenses, setSubmittedExpenses] = useState<TableRow[]>([]);
   const [recentExpenseRowId, setRecentExpenseRowId] = useState<string | null>(null);
   const [selectedDraft, setSelectedDraft] = useState<ExpenseDraftData | null>(null);
-  const [showSavedToast, setShowSavedToast] = useState(false);
-  const [showSubmittedToast, setShowSubmittedToast] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: "90d" });
   const [draftDateFilter, setDraftDateFilter] = useState<DateFilter>({ type: "90d" });
   const [customMonth, setCustomMonth] = useState(() => new Date());
@@ -108,18 +108,6 @@ export function ExpenseOverview() {
   }, [submittedExpenses]);
 
   useEffect(() => {
-    if (!showSavedToast) return;
-    const timer = window.setTimeout(() => setShowSavedToast(false), 2600);
-    return () => window.clearTimeout(timer);
-  }, [showSavedToast]);
-
-  useEffect(() => {
-    if (!showSubmittedToast) return;
-    const timer = window.setTimeout(() => setShowSubmittedToast(false), 2600);
-    return () => window.clearTimeout(timer);
-  }, [showSubmittedToast]);
-
-  useEffect(() => {
     function onPointerDown(e: MouseEvent) {
       const target = e.target as Node;
       if (filterOpen && filterRef.current && !filterRef.current.contains(target)) {
@@ -144,8 +132,10 @@ export function ExpenseOverview() {
       return next.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     });
     setSelectedDraft(null);
-    setShowSavedToast(true);
     setNewExpenseOpen(false);
+    toast("Expense saved to drafts", {
+      description: "Resume anytime from Pending requests.",
+    });
   }
 
   function handleOpenDraft(draft: ExpenseDraftData) {
@@ -169,7 +159,7 @@ export function ExpenseOverview() {
 
   function handleSubmitExpense(expense: ExpenseDraftData) {
     const submittedIso = new Date().toISOString().slice(0, 10);
-    const requester = "you@designhub.com";
+    const requester = CURRENT_USER_EMAIL;
     const rowId = `submitted-${expense.id}`;
     const nextRow: TableRow = {
       id: rowId,
@@ -181,13 +171,15 @@ export function ExpenseOverview() {
       type: expense.type === "Reimbursement" ? "Reimbursement" : "Expense",
       amount: toMoney(expense.amount),
       category: (expense.category || "Other") as TableRow["category"],
+      lineItems: expense.items.filter((item) => item.name?.trim() || item.amount?.trim()),
+      description: expense.description,
+      attachmentNames: expense.attachments.map((a) => a.name),
     };
     setSubmittedExpenses((prev) => [nextRow, ...prev.filter((row) => row.id !== rowId)]);
     setRecentExpenseRowId(rowId);
     setDateFilter({ type: "90d" });
   }
 
-  const pendingRows = useMemo(() => [...submittedExpenses, ...seedRows], [submittedExpenses]);
   const filterLabel = useMemo(() => {
     if (dateFilter.type === "today") return "Today";
     if (dateFilter.type === "30d") return "Last 30 days";
@@ -407,7 +399,7 @@ export function ExpenseOverview() {
           <PendingTable
             draftItems={drafts}
             onOpenDraft={handleOpenDraft}
-            rows={pendingRows}
+            rows={submittedExpenses}
             dateFilter={dateFilter}
             newlyAddedRowId={recentExpenseRowId}
           />
@@ -424,21 +416,20 @@ export function ExpenseOverview() {
         onSaveDraft={handleSaveDraft}
         onSubmitExpense={handleSubmitExpense}
         onSubmitSuccessAcknowledge={() => {
-          setShowSubmittedToast(true);
           setNewExpenseOpen(false);
           setSelectedDraft(null);
+          toast("Expense submitted successfully", {
+            description: new Date().toLocaleString(undefined, {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            }),
+          });
         }}
       />
-      {showSavedToast && (
-        <div className="app-toast fixed bottom-6 right-6 z-[320] rounded-[12px] border border-[#DFE1E6] bg-white px-4 py-3 text-sm font-medium text-[#272835] shadow-[0_10px_24px_rgba(13,13,18,0.12)]">
-          Expense saved to drafts
-        </div>
-      )}
-      {showSubmittedToast && (
-        <div className="app-toast fixed bottom-6 right-6 z-[320] rounded-[12px] border border-[#DFE1E6] bg-white px-4 py-3 text-sm font-medium text-[#272835] shadow-[0_10px_24px_rgba(13,13,18,0.12)]">
-          Expense submitted successfully
-        </div>
-      )}
     </div>
   );
 }

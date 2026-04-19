@@ -1,7 +1,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ExpenseDraftData } from "./NewExpenseFlow";
+import type { DraftItem, ExpenseDraftData } from "./NewExpenseFlow";
+import { CURRENT_USER_AVATAR_SRC, CURRENT_USER_EMAIL } from "@/lib/currentUser";
+import { getAttachmentIconSrc } from "@/lib/attachmentIcon";
 
 function InvoiceIcon() {
   return (
@@ -71,6 +73,11 @@ export interface TableRow {
   type: EntryType;
   amount: string;
   category: Category;
+  /** Present for user-submitted expenses; seed rows use a demo breakdown when absent. */
+  lineItems?: DraftItem[];
+  /** From the new-expense flow when the row is user-submitted (`id` starts with `submitted-`). */
+  description?: string;
+  attachmentNames?: string[];
 }
 
 function toIsoDate(d: Date): string {
@@ -186,6 +193,7 @@ const categoryIcon: Record<Category, React.ReactNode> = {
 };
 
 function avatarForRequester(requester: string) {
+  if (requester === CURRENT_USER_EMAIL) return CURRENT_USER_AVATAR_SRC;
   // Map row requester -> Figma avatar images (copied into /public).
   switch (requester) {
     case "olivia.harris@designhub.com":
@@ -206,6 +214,13 @@ function avatarForRequester(requester: string) {
 }
 
 function getNotesAndAttachments(row: TableRow): { notesText: string; attachments: string[] } {
+  if (row.id.startsWith("submitted-")) {
+    return {
+      notesText: row.description?.trim() || "No description provided.",
+      attachments: row.attachmentNames ?? [],
+    };
+  }
+
   const handle = row.requester.split("@")[0]?.replace(/\./g, "_") ?? "requester";
 
   const byCategory: Record<
@@ -426,6 +441,11 @@ export function PendingTable({
     return Number.isFinite(n) ? n : 0;
   }
 
+  function parseDraftLineUnitPrice(amount: string): number {
+    const n = Number(amount.replace(/,/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }
+
   function hashString(s: string): number {
     // Deterministic lightweight hash for stable IDs.
     let h = 0;
@@ -448,13 +468,21 @@ export function PendingTable({
 
   const breakdownItems = selectedRow
     ? (() => {
-        const total = parseCurrencyAmount(selectedRow.amount);
         const round2 = (x: number) => Math.round(x * 100) / 100;
+        const fromDraft = selectedRow.lineItems?.filter((i) => i.name?.trim() || i.amount?.trim());
+        if (fromDraft && fromDraft.length > 0) {
+          return fromDraft.map((it, idx) => ({
+            name: it.name.trim() || `Item ${idx + 1}`,
+            unit: round2(parseDraftLineUnitPrice(it.amount)),
+            qty: Math.max(1, Number(it.quantity) || 1),
+          }));
+        }
 
-        // Allocate the total across 3 line items, and keep qty consistent with the UI.
-        const laborUnit = round2(total * 0.2); // Labor x 1
-        const airUnit = round2((total * 0.2) / 4); // Air filter x 4
-        const thermostatUnit = round2(total - laborUnit - airUnit * 4); // Remaining x 1
+        const total = parseCurrencyAmount(selectedRow.amount);
+        // Demo-only breakdown for seed rows (no persisted line items).
+        const laborUnit = round2(total * 0.2);
+        const airUnit = round2((total * 0.2) / 4);
+        const thermostatUnit = round2(total - laborUnit - airUnit * 4);
 
         return [
           { name: "Thermostat replacement", unit: thermostatUnit, qty: 1 },
@@ -795,19 +823,23 @@ export function PendingTable({
               <div className="space-y-2">
                 <p className="text-sm text-[#272835] font-medium">Attachments</p>
                 <div className="flex flex-wrap gap-3">
-                  {attachments.map((name, idx) => (
-                    <button
-                      key={`${name}-${idx}`}
-                      type="button"
-                      className="flex items-center gap-2 bg-[#F4F5F8] border border-transparent rounded-lg px-3 py-2 text-sm text-[#272835]"
-                    >
-                      <img src="/group-2.svg" alt="" width="16" height="16" />
-                      <span className="font-medium">{name}</span>
-                      <span className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded-lg text-[#808897]">
-                        <img src="/download-circle-01.svg" alt="" width="16" height="16" />
-                      </span>
-                    </button>
-                  ))}
+                  {attachments.length === 0 ? (
+                    <p className="text-sm text-[#808897]">No attachments</p>
+                  ) : (
+                    attachments.map((name, idx) => (
+                      <button
+                        key={`${name}-${idx}`}
+                        type="button"
+                        className="flex items-center gap-2 bg-[#F4F5F8] border border-transparent rounded-lg px-3 py-2 text-sm text-[#272835]"
+                      >
+                        <img src={getAttachmentIconSrc(name)} alt="" width="20" height="20" className="shrink-0 object-contain" />
+                        <span className="font-medium">{name}</span>
+                        <span className="ml-auto inline-flex items-center justify-center w-6 h-6 rounded-lg text-[#808897]">
+                          <img src="/download-circle-01.svg" alt="" width="16" height="16" />
+                        </span>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
