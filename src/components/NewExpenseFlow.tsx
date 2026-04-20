@@ -110,7 +110,7 @@ function MonitorIcon() {
 
 function TruckIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12.5001 1.66669V10C12.5001 10.9167 11.7501 11.6667 10.8334 11.6667H1.66675V5.00002C1.66675 3.15835 3.15841 1.66669 5.00008 1.66669H12.5001Z" />
       <path d="M18.3334 11.6667V14.1667C18.3334 15.55 17.2167 16.6667 15.8334 16.6667H15.0001C15.0001 15.75 14.2501 15 13.3334 15C12.4167 15 11.6667 15.75 11.6667 16.6667H8.33341C8.33341 15.75 7.58341 15 6.66675 15C5.75008 15 5.00008 15.75 5.00008 16.6667H4.16675C2.78341 16.6667 1.66675 15.55 1.66675 14.1667V11.6667H10.8334C11.7501 11.6667 12.5001 10.9167 12.5001 10V4.16669H14.0334C14.6334 4.16669 15.1834 4.4917 15.4834 5.00836L16.9084 7.50002H15.8334C15.3751 7.50002 15.0001 7.87502 15.0001 8.33335V10.8334C15.0001 11.2917 15.3751 11.6667 15.8334 11.6667H18.3334Z" />
       <path d="M6.66667 18.3333C7.58714 18.3333 8.33333 17.5871 8.33333 16.6667C8.33333 15.7462 7.58714 15 6.66667 15C5.74619 15 5 15.7462 5 16.6667C5 17.5871 5.74619 18.3333 6.66667 18.3333Z" />
@@ -246,6 +246,7 @@ export function NewExpenseFlow({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const reuploadInputRef = useRef<HTMLInputElement | null>(null);
   const reuploadIndexRef = useRef<number | null>(null);
+  const lastDueDateSelectionTsRef = useRef(0);
   const dragCounterRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [submitSuccessOpen, setSubmitSuccessOpen] = useState(false);
@@ -565,7 +566,81 @@ export function NewExpenseFlow({
                 <p className="text-sm text-[#6C7386] tracking-[0.28px] mt-1">Create a new expense or reimbursement to be approved</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <label className="mb-0 block space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-[#6C7386] tracking-[0.28px]">Items</span>
+                  <div className="inline-flex items-center justify-center rounded-full border-0 border-none border-transparent [border-image:none] p-0 bg-transparent">
+                    <span className="text-sm font-semibold leading-3 align-middle text-[#272835]">${totalAmountValue}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {draft.items.map((item, idx) => (
+                    <div key={`item-${idx}`} className="rounded-[12px] border border-[#DFE1E6] bg-white p-4 space-y-2">
+                      <input
+                        value={item.name}
+                        onChange={(e) => updateItemRow(idx, "name", e.target.value)}
+                        className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-3 text-sm text-[#272835] outline-none focus-visible:border-[#6573F9] focus-visible:ring-2 focus-visible:ring-[#6573F9]/20"
+                        placeholder="Item name"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-3 bg-white flex items-center gap-1 text-sm transition-[border-color,box-shadow] focus-within:border-[#6573F9] focus-within:ring-2 focus-within:ring-[#6573F9]/20">
+                          <span className="text-[#272835]">$</span>
+                          <input
+                            value={item.amount}
+                            onChange={(e) => updateItemRow(idx, "amount", normalizeAmountValue(e.target.value))}
+                            className="flex-1 bg-transparent text-sm text-[#272835] outline-none"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-2 bg-white flex items-center justify-between text-sm text-[#272835]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Math.max(1, Number(item.quantity) || 1);
+                              updateItemRow(idx, "quantity", String(Math.max(1, current - 1)));
+                            }}
+                            className="w-6 h-6 rounded-md text-[#808897] hover:bg-[#F4F5F8] hover:text-[#272835] inline-flex items-center justify-center"
+                            aria-label="Decrease quantity"
+                          >
+                            -
+                          </button>
+                          <span className="min-w-[20px] text-center font-medium">{Math.max(1, Number(item.quantity) || 1)}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Math.max(1, Number(item.quantity) || 1);
+                              updateItemRow(idx, "quantity", String(Math.min(999, current + 1)));
+                            }}
+                            className="w-6 h-6 rounded-md text-[#808897] hover:bg-[#F4F5F8] hover:text-[#272835] inline-flex items-center justify-center"
+                            aria-label="Increase quantity"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      {draft.items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeItemRow(idx)}
+                          className="inline-flex items-center gap-1 text-xs text-[#DF1C41] hover:opacity-80"
+                        >
+                          Remove item
+                          <TrashVuesaxIcon />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addItemRow}
+                  className="inline-flex w-fit h-fit items-center px-0 rounded-[10px] border-none text-sm text-[#6573F9] bg-transparent hover:bg-transparent"
+                >
+                  + Add another item
+                </button>
+              </label>
+
+              <div className="flex flex-col gap-4">
                 <Field label="Type">
                   <div className="relative">
                     <select
@@ -583,14 +658,21 @@ export function NewExpenseFlow({
                   <div className="relative" ref={dueRef}>
                     <button
                       type="button"
-                      onClick={() => setDueOpen((prev) => !prev)}
+                      onClick={() => {
+                        if (Date.now() - lastDueDateSelectionTsRef.current < 250) return;
+                        setDueOpen((prev) => !prev);
+                      }}
                       className="w-full h-12 rounded-[12px] border border-[#DFE1E6] bg-white pl-4 pr-10 text-sm text-left text-[#272835] outline-none transition-[border-color,box-shadow] focus-visible:border-[#6573F9] focus-visible:ring-2 focus-visible:ring-[#6573F9]/20"
                     >
                       {draft.dueDate ? dueDateText : "Select due date"}
                     </button>
                     <img src="/calendar.svg" alt="" width="20" height="20" className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                     {dueOpen && (
-                      <div className="absolute z-20 mt-2 w-[280px] rounded-xl border border-[#DFE1E6] bg-white p-3 shadow-[0_10px_20px_rgba(13,13,18,0.08)]">
+                      <div
+                        className="absolute z-20 mt-2 w-[280px] rounded-xl border border-[#DFE1E6] bg-white p-3 shadow-[0_10px_20px_rgba(13,13,18,0.08)]"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <button type="button" className="w-7 h-7 rounded-md hover:bg-[#F4F5F8] inline-flex items-center justify-center" onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))}>
                             <img src="/calendar-prev.svg" alt="Previous month" width="18" height="18" />
@@ -619,9 +701,10 @@ export function NewExpenseFlow({
                                 disabled={isPast}
                                 onClick={() => {
                                   if (isPast) return;
+                                  lastDueDateSelectionTsRef.current = Date.now();
+                                  setDueOpen(false);
                                   setDraft((prev) => ({ ...prev, dueDate: cell.iso }));
                                   setVisibleMonth(new Date(cell.iso));
-                                  setDueOpen(false);
                                 }}
                                 className={`h-8 rounded-md text-xs ${isSelected ? "bg-[#5E56FF] text-white hover:bg-[#5E56FF]" : "text-[#272835]"} ${isMuted ? "opacity-40" : ""} ${isPast ? "opacity-30 cursor-not-allowed" : isSelected ? "" : "hover:bg-[#F4F5F8]"}`}
                               >
@@ -715,80 +798,6 @@ export function NewExpenseFlow({
                 )}
               </Field>
 
-              <Field label="Items">
-                <div className="space-y-2">
-                  {draft.items.map((item, idx) => (
-                    <div key={`item-${idx}`} className="rounded-[12px] border border-[#DFE1E6] bg-white p-4 space-y-2">
-                      <input
-                        value={item.name}
-                        onChange={(e) => updateItemRow(idx, "name", e.target.value)}
-                        className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-3 text-sm text-[#272835] outline-none focus-visible:border-[#6573F9] focus-visible:ring-2 focus-visible:ring-[#6573F9]/20"
-                        placeholder="Item name"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-3 bg-white flex items-center gap-1 text-sm transition-[border-color,box-shadow] focus-within:border-[#6573F9] focus-within:ring-2 focus-within:ring-[#6573F9]/20">
-                          <span className="text-[#272835]">$</span>
-                          <input
-                            value={item.amount}
-                            onChange={(e) => updateItemRow(idx, "amount", normalizeAmountValue(e.target.value))}
-                            className="flex-1 bg-transparent text-sm text-[#272835] outline-none"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <div className="w-full h-10 rounded-[10px] border border-[#DFE1E6] px-2 bg-white flex items-center justify-between text-sm text-[#272835]">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = Math.max(1, Number(item.quantity) || 1);
-                              updateItemRow(idx, "quantity", String(Math.max(1, current - 1)));
-                            }}
-                            className="w-6 h-6 rounded-md text-[#808897] hover:bg-[#F4F5F8] hover:text-[#272835] inline-flex items-center justify-center"
-                            aria-label="Decrease quantity"
-                          >
-                            -
-                          </button>
-                          <span className="min-w-[20px] text-center font-medium">{Math.max(1, Number(item.quantity) || 1)}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = Math.max(1, Number(item.quantity) || 1);
-                              updateItemRow(idx, "quantity", String(Math.min(999, current + 1)));
-                            }}
-                            className="w-6 h-6 rounded-md text-[#808897] hover:bg-[#F4F5F8] hover:text-[#272835] inline-flex items-center justify-center"
-                            aria-label="Increase quantity"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                      {draft.items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItemRow(idx)}
-                          className="inline-flex items-center gap-1 text-xs text-[#DF1C41] hover:opacity-80"
-                        >
-                          Remove item
-                          <TrashVuesaxIcon />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={addItemRow}
-                    className="inline-flex items-center h-9 px-3 rounded-[10px] border border-[#DFE1E6] text-sm text-[#272835] bg-white hover:bg-[#F8F8F9]"
-                  >
-                    + Add another item
-                  </button>
-                  <div className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#EFF0FC] border border-[#E8E8FC] px-3 pt-[9px] pb-2">
-                    <span className="text-xs font-medium leading-3 align-middle text-[rgba(39,40,53,1)] tracking-[0.24px]">Total:</span>
-                    <span className="text-xs font-semibold leading-3 align-middle text-[#272835]">${totalAmountValue}</span>
-                  </div>
-                </div>
-              </Field>
-
               <Field label="Attachments">
                 <input
                   ref={fileInputRef}
@@ -837,7 +846,7 @@ export function NewExpenseFlow({
                 ) : (
                   <div className="space-y-2">
                     {draft.attachments.map((file, idx) => (
-                      <div key={`${file.name}-${idx}`} className="h-[44px] rounded-[12px] border border-[#DFE1E6] bg-white px-3 flex items-center gap-2">
+                      <div key={`${file.name}-${idx}`} className="h-[44px] rounded-[12px] border border-[#DFE1E6] bg-white px-3 py-7 flex items-center gap-2">
                         <img
                           src={getAttachmentIconSrc(file.name)}
                           alt=""
@@ -1007,10 +1016,10 @@ export function NewExpenseFlow({
         if (!nextOpen) backToOverviewAfterSuccess();
       }}
     >
-      <DialogContent className="inset-0 left-0 top-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col justify-center rounded-none border-0 bg-white p-8 shadow-none sm:max-w-none gap-6 overflow-y-auto">
-        <DialogHeader className="items-center text-center sm:text-center space-y-0">
-          <div className="success-checkmark mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EAFBF0] text-[26px] font-semibold text-[#0EAD5B]">
-            ✓
+      <DialogContent className="inset-0 left-0 top-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center rounded-none border-0 bg-white p-8 shadow-none sm:max-w-none gap-6 overflow-y-auto">
+        <DialogHeader className="w-[380px] items-center text-center sm:text-center space-y-0">
+          <div className="success-checkmark mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EAFBF0]">
+            <img src="/bold-check.svg" alt="" width={24} height={24} className="shrink-0" />
           </div>
           <DialogTitle className="mt-5 text-[22px] leading-[1.3] font-semibold text-[#272835]">
             Expense logged successfully
@@ -1044,7 +1053,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-5">
       <p className="text-[#6C7386] font-medium w-[180px]">{label}</p>
-      <div>{value}</div>
+      <div className="text-right">{value}</div>
     </div>
   );
 }

@@ -423,7 +423,13 @@ export function ExpenseOverview() {
         onSubmitSuccessAcknowledge={() => {
           setNewExpenseOpen(false);
           setSelectedDraft(null);
-          toast("Expense submitted successfully");
+          toast("Expense submitted successfully", {
+            icon: (
+              <span aria-hidden="true" className="font-semibold text-[#0EAD5B]">
+                ✓
+              </span>
+            ),
+          });
         }}
       />
     </div>
