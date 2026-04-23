@@ -64,33 +64,130 @@ body {
   animation: slideInRowDown 320ms ease-out both;
 }
 
-/** Success dialog checkmark: rest, then replay pop in the last ~8% of each 5s cycle. */
-@keyframes successCheckmarkLoop {
-  0%,
-  92% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-  93% {
-    transform: scale(0.7) rotate(-8deg);
-    opacity: 0.85;
-  }
-  97% {
-    transform: scale(1.08) rotate(2deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
+.expense-success-slot {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  margin-inline: auto;
+}
+
+.expense-success-morph-overlay {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%) scale(0.78);
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background: #111111;
+  box-shadow: 0 20px 35px -12px rgba(17, 17, 17, 0.45), 0 10px 20px -8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), background 240ms ease, box-shadow 240ms ease;
+}
+
+.expense-success-slot.is-success .expense-success-morph-overlay {
+  transform: translate(-50%, -50%) scale(1);
+  background: #22c55e;
+  box-shadow: 0 20px 35px -12px rgba(34, 197, 94, 0.5), 0 10px 20px -8px rgba(0, 0, 0, 0.2);
+}
+
+.expense-success-loader {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid rgba(255, 255, 255, 0.92);
+  border-right-color: rgba(255, 255, 255, 0.24);
+  border-radius: 9999px;
+  opacity: 1;
+  transform: scale(1);
+  animation: expenseSuccessSpin 700ms linear infinite;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.expense-success-slot.is-success .expense-success-loader {
+  opacity: 0;
+  transform: scale(0.84);
+}
+
+.expense-success-check {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1) 280ms, opacity 250ms ease 280ms;
+}
+
+.expense-success-slot.is-success .expense-success-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.expense-success-check path {
+  stroke: #fff;
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+}
+
+.expense-success-slot.is-success .expense-success-check path {
+  animation: expenseSuccessDrawCheck 500ms cubic-bezier(0.65, 0.05, 0.36, 1) 330ms forwards;
+}
+
+.expense-success-pulse {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  border: 2px solid #22c55e;
+  opacity: 0;
+  transform: scale(1);
+  pointer-events: none;
+}
+
+.expense-success-slot.is-success .expense-success-pulse {
+  animation: expenseSuccessPulseRing 900ms cubic-bezier(0.3, 0.6, 0.4, 1) 460ms forwards;
+}
+
+@keyframes expenseSuccessSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-.success-checkmark {
-  animation: successCheckmarkLoop 5s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+@keyframes expenseSuccessDrawCheck {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes expenseSuccessPulseRing {
+  0% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .success-checkmark {
+  .expense-success-morph-overlay,
+  .expense-success-loader,
+  .expense-success-check,
+  .expense-success-pulse {
+    transition: none;
     animation: none;
+  }
+
+  .expense-success-slot.is-success .expense-success-check path {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }

@@ -250,6 +250,7 @@ export function NewExpenseFlow({
   const dragCounterRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [submitSuccessOpen, setSubmitSuccessOpen] = useState(false);
+  const [submitSuccessStage, setSubmitSuccessStage] = useState<"loading" | "success">("loading");
   const [draft, setDraft] = useState<ExpenseDraft>({
     amount: "",
     type: "Expense request",
@@ -291,6 +292,19 @@ export function NewExpenseFlow({
       });
     }
   }, [open, initialDraft]);
+
+  useEffect(() => {
+    if (!submitSuccessOpen) {
+      setSubmitSuccessStage("loading");
+      return;
+    }
+
+    const successTimer = window.setTimeout(() => {
+      setSubmitSuccessStage("success");
+    }, 900);
+
+    return () => window.clearTimeout(successTimer);
+  }, [submitSuccessOpen]);
 
   useEffect(() => {
     function onPointerDown(e: MouseEvent) {
@@ -1018,14 +1032,22 @@ export function NewExpenseFlow({
     >
       <DialogContent className="inset-0 left-0 top-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center rounded-none border-0 bg-white p-8 shadow-none sm:max-w-none gap-6 overflow-y-auto">
         <DialogHeader className="w-[380px] items-center text-center sm:text-center space-y-0">
-          <div className="success-checkmark mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EAFBF0]">
-            <img src="/bold-check.svg" alt="" width={24} height={24} className="shrink-0" />
+          <div className={`expense-success-slot ${submitSuccessStage === "loading" ? "is-loading" : "is-success"}`} aria-hidden="true">
+            <div className="expense-success-morph-overlay">
+              <div className="expense-success-loader" />
+              <svg className="expense-success-check" viewBox="0 0 44 44">
+                <path d="M 10 22 L 19 31 L 34 14" />
+              </svg>
+              <div className="expense-success-pulse" />
+            </div>
           </div>
           <DialogTitle className="mt-5 text-[22px] leading-[1.3] font-semibold text-[#272835]">
-            Expense logged successfully
+            {submitSuccessStage === "loading" ? "Logging expense..." : "Expense logged successfully"}
           </DialogTitle>
           <DialogDescription className="mt-2 text-sm text-[#6C7386]">
-            Your expense request has been submitted and is now pending approval.
+            {submitSuccessStage === "loading"
+              ? "We're submitting your expense request now."
+              : "Your expense request has been submitted and is now pending approval."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="w-full max-w-[400px] flex-col gap-0 sm:flex-col mx-auto sm:justify-center">
